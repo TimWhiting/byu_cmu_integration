@@ -1,0 +1,10 @@
+(Markov Game MDP)
+	rock_paper_scissors
+(Agents)
+	Q-learning,0
+	fixed-policy,1
+(Params)
+	instances : 15
+	episodes : 1
+	steps : 40
+	track_disc_reward : False

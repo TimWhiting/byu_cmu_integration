@@ -1,0 +1,1 @@
+python3 -m pip install git+https://github.com/TimWhiting/simple_rl@77c0d6b910efbe8bdd5f4f87337c5bc4aed0d79c
