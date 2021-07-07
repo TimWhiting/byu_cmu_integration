@@ -14,7 +14,7 @@ from simple_rl.agents import QLearningAgent, FixedPolicyAgent
 from simple_rl.run_experiments import play_markov_game 
 P1 = 0
 P2 = 1
-ACTIONS = ["red square", "blue square", "purple square"]
+ACTIONS = ["A", "B", "C"] # Player 2's actions are also known as D E F
 payoff_matrix = [[{0: 0, 1: 0}, {0: 35, 1: 70}, {0: 100, 1: 40}], [{0: 70, 1: 35 }, {0: 10, 1: 10}, {0: 45, 1: 30}], [{0: 40, 1: 100}, {0: 30, 1 : 45}, {0: 40, 1: 40}]]
 
 class AlternatorState(State):
