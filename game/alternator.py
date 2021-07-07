@@ -14,15 +14,14 @@ from simple_rl.agents import QLearningAgent, FixedPolicyAgent
 from simple_rl.run_experiments import play_markov_game 
 P1 = 0
 P2 = 1
-ACTIONS = ["red square", "blue square", "purple square", "red triangle", "blue triangle", "purple triangle", "red circle", "blue circle", "purple circle"]
+ACTIONS = ["red square", "blue square", "purple square"]
+payoff_matrix = [[{0: 0, 1: 0}, {0: 35, 1: 70}, {0: 100, 1: 40}], [{0: 70, 1: 35 }, {0: 10, 1: 10}, {0: 45, 1: 30}], [{0: 40, 1: 100}, {0: 30, 1 : 45}, {0: 40, 1: 40}]]
 
-class BlockGameState(State):
+class AlternatorState(State):
     ''' Abstract State class '''
 
-    CENTER = 3
     def __init__(self):
-        self.blocks = [3 for _ in range(0, 9)]
-        self.turn = P1
+        self.selection = [-1, -1]
 
     def features(self):
         '''
@@ -33,100 +32,52 @@ class BlockGameState(State):
         Returns:
             (iterable)
         '''
-        return np.array([self.blocks, self.turn]).flatten()
+        return self.selection
 
     def get_data(self):
-        return [self.blocks, self.turn]
+        return self.selection
 
     def get_num_feats(self):
-        return len(self.blocks()) + 1
+        return 2
 
     def is_terminal(self):
-        return self.blocks.count(self.CENTER) == 3
+        return self.selection[0] != -1 and self.selection[1] != -1
 
     def __hash__(self):
-        # print(str([self.blocks, self.turn]))
-        return hash(str([self.blocks, self.turn]))
+        return hash(str(self.selection))
 
     def __str__(self):
-        return "s." + str(self.blocks) + '.turn.' + str(self.turn)
+        return "s." + str(self.selection) 
 
     def __eq__(self, other):
         if isinstance(other, State):
-            return self.blocks == other.blocks and self.turn == other.turn
+            return self.selection == other.selection
         return False
 
     def __getitem__(self, index):
-        if index < 9:
-          return self.blocks[index]
-        else:
-          return self.turn
+        if index < 2:
+          return self.selection[index]
+        return -1
 
     def __len__(self):
-        return len(self.data) + 1
+        return len(self.selection) 
 
     def next(self, action_0, action_1):
         act0 = ACTIONS.index(action_0)
         act1 = ACTIONS.index(action_1)
-        state = BlockGameState()
-        if self.turn == P1:
-          if self.blocks[act0] == self.CENTER:
-            state.blocks = copy(self.blocks)
-            state.blocks[act0] = P1
-            state.turn = P2
-            return state
-          else:
-            pass
-        if self.turn == P2:
-          if self.blocks[act1] == self.CENTER:
-            state.blocks = copy(self.blocks)
-            state.blocks[act1] = P2
-            state.turn = P1
-            return state
-          else:
-            pass
-        return self
+        state = AlternatorState()
+        state.selection[0] = act0
+        state.selection[1] = act1
+        return state
 
-    REWARDS = [75, 65, 60, 25, 15, 10, 15, 5, 0]
     def reward(self, player):
-      reward = 0
-      playerBlocks = []
-      for (idx, block) in enumerate(self.blocks):
-        if block == player:
-          reward += self.REWARDS[idx]
-          playerBlocks.append(idx)
-      # All the same shape
-      shapes = [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
-      if anyOf(shapes, lambda x: allOf(x, lambda y: y in playerBlocks)):
-        return reward
-      # All the same color
-      colors = [[0, 3, 6], [1, 4, 7], [2, 5, 8]]
-      if anyOf(colors, lambda x: allOf(x, lambda y: y in playerBlocks)):
-        return reward
-      # Mixed sets
-      mixed = [[0, 4, 8], [0, 5, 7], [1, 3, 8], [1, 5, 6], [2, 3, 7], [2, 4, 6]]
-      if anyOf(mixed, lambda x: allOf(x, lambda y: y in playerBlocks)):
-        return reward
-      else:
-        return -reward / 4
+        return payoff_matrix[self.selection[0]][self.selection[1]][player]
 
-def anyOf(iter, fcn):
-  for x in iter:
-    if fcn(x):
-      return True
-  return False
-
-def allOf(iter, fcn):
-  for x in iter:
-    if not fcn(x):
-      return False
-  return True
-
-class BlockGameMDP(MarkovGameMDP):
+class AlternatorMDP(MarkovGameMDP):
     ''' Class for a Block Game '''
 
     def __init__(self):
-        state = BlockGameState()        
+        state = AlternatorState()        
         MarkovGameMDP.__init__(self, ACTIONS, self._transition_func, self._reward_func, init_state=state)
 
     def _reward_func(self, state, action_dict, next_state=None):
@@ -173,7 +124,7 @@ class BlockGameMDP(MarkovGameMDP):
         return state.next(action_a, action_b)
       
     def __str__(self):
-        return "block game"
+        return "alternator game"
 
     def end_of_instance(self):
         return self.get_curr_state().is_terminal()
@@ -181,7 +132,7 @@ class BlockGameMDP(MarkovGameMDP):
 
 def main(open_plot=True):
     # Setup MDP, Agents.
-    markov_game = BlockGameMDP()
+    markov_game = AlternatorMDP()
     ql_agent = QLearningAgent(actions=markov_game.get_actions(), name="q1")
     fixed_agent = QLearningAgent(actions=markov_game.get_actions(), name="q2")
 

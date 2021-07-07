@@ -1,0 +1,10 @@
+(Markov Game MDP)
+	alternator game
+(Agents)
+	Q-learning,0
+	q2,1
+(Params)
+	instances : 5
+	episodes : 500
+	steps : 30
+	track_disc_reward : False
