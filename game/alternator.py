@@ -11,7 +11,7 @@ from copy import copy
 from simple_rl.mdp.markov_game.MarkovGameMDPClass import MarkovGameMDP
 from simple_rl.mdp.StateClass import State
 from simple_rl.agents import QLearningAgent, FixedPolicyAgent
-from simple_rl.run_experiments import play_markov_game 
+from simple_rl.run_experiments import play_markov_game
 P1 = 0
 P2 = 1
 ACTIONS = ["A", "B", "C"] # Player 2's actions are also known as D E F
@@ -115,8 +115,8 @@ class AlternatorMDP(MarkovGameMDP):
         Returns
             (State)
         '''
-        if state.is_terminal():
-          return state
+        # if state.is_terminal(): commenting this out since it doesn't allow us to know previous actions
+        #   return state
         actions = list(action.keys())
         agent_a, agent_b = actions[P1], actions[P2]
         action_a, action_b = action[agent_a], action[agent_b]
