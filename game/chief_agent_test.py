@@ -22,8 +22,6 @@ def create_agents(other_player):
 
 		# Minimax Agent
 		FixedPolicyAgent(policy=(lambda x: ACTIONS[1]), name='Minimax'),
-		# Maximin Agent
-		FixedPolicyAgent(policy=(lambda x: ACTIONS[1]), name='Maximin'),
 		# Maximize Both Player's Payoffs
 		FixedPolicyAgent(policy=(lambda x: ACTIONS[(2-x.selection[this_player]) % 3] if x.selection[this_player] != -1 else ACTIONS[0]), name='MaxWelfare'),
 		FixedPolicyAgent(policy=(lambda x: ACTIONS[(2-x.selection[this_player]) % 3] if x.selection[this_player] != -1 else ACTIONS[2]), name='MaxWelfare2'),
