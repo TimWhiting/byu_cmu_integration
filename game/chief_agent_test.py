@@ -8,10 +8,38 @@ from simple_rl.run_experiments import play_markov_game
 
 markov_game = AlternatorMDP()
 
-policy1 = (lambda x: ACTIONS[x.selection[1]]) # return teammate's previous action
-policy2 = (lambda x: ACTIONS[(x.selection[1] + 1)%3]) # return cycling through own moves
+# policy1 = (lambda x: ACTIONS[x.selection[1]]) # return teammate's previous action
+# policy2 = (lambda x: ACTIONS[(x.selection[1] + 1)%3]) # return cycling through own moves
 
-pool_agents = [FixedPolicyAgent(policy=policy1, name="agent1"), FixedPolicyAgent(policy=policy2, name="agent2")]
+
+pool_agents = create_agents(1)
+
+def create_agents(other_player):
+	this_player = (other_player + 1) % 2
+	return [
+		### Fixed Policy Agents
+
+		# Minimax Agent
+		FixedPolicyAgent(policy=(lambda x: ACTIONS[1]), name='Minimax'),
+		# Maximin Agent
+		FixedPolicyAgent(policy=(lambda x: ACTIONS[1]), name='Maximin'),
+		# Maximize Both Player's Payoffs
+		FixedPolicyAgent(policy=(lambda x: ACTIONS[(2-x.selection[this_player]) % 3] if x.selection[this_player] != -1 else ACTIONS[0]), name='MaxWelfare'),
+		FixedPolicyAgent(policy=(lambda x: ACTIONS[(2-x.selection[this_player]) % 3] if x.selection[this_player] != -1 else ACTIONS[2]), name='MaxWelfare2'),
+		# Maximize Own Payoffs
+		FixedPolicyAgent(policy=(lambda x: ACTIONS[0]), name='MaxPlayer1'),
+		# Maximize Their Payoffs
+		FixedPolicyAgent(policy=(lambda x: ACTIONS[2]), name='MaxPlayer2'),
+
+
+		### Adaptive Agents
+
+		# Ficticious Play Agent
+	]
+
+
+
+
 temp_teammates = deepcopy(pool_agents)
 
 for a in temp_teammates:
