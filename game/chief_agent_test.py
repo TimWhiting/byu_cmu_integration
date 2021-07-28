@@ -11,6 +11,7 @@ markov_game = AlternatorMDP()
 # policy1 = (lambda x: ACTIONS[x.selection[1]]) # return teammate's previous action
 # policy2 = (lambda x: ACTIONS[(x.selection[1] + 1)%3]) # return cycling through own moves
 
+## VISUALIZATIONS (Look at PyGame) TODO: Arnav / Mike
 
 pool_agents = create_agents(1)
 
@@ -32,9 +33,15 @@ def create_agents(other_player):
 		FixedPolicyAgent(policy=(lambda x: ACTIONS[2]), name='MaxPlayer2'),
 
 
-		### Adaptive Agents
+		### Adaptive Agents TODO: Tim / Najma
 
 		# Ficticious Play Agent
+
+		# Agent that adapts over time to become more efficient
+
+		# Tit for Tat
+
+		# Tit for 2 Tats 
 	]
 
 
