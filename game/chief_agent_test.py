@@ -13,7 +13,6 @@ markov_game = AlternatorMDP()
 
 ## VISUALIZATIONS (Look at PyGame) TODO: Arnav / Mike
 
-pool_agents = create_agents(1)
 
 def create_agents(other_player):
 	this_player = (other_player + 1) % 2
@@ -43,6 +42,7 @@ def create_agents(other_player):
 	]
 
 
+pool_agents = create_agents(1)
 
 
 temp_teammates = deepcopy(pool_agents)
