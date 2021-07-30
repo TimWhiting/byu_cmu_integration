@@ -22,6 +22,7 @@ class AlternatorState(State):
 
     def __init__(self):
         self.selection = [-1, -1]
+        self.round = 0
 
     def features(self):
         '''
@@ -68,6 +69,7 @@ class AlternatorState(State):
         state = AlternatorState()
         state.selection[0] = act0
         state.selection[1] = act1
+        state.round = self.round + 1
         return state
 
     def reward(self, player):

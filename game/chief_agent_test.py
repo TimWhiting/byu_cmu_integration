@@ -8,7 +8,7 @@ from simple_rl.run_experiments import play_markov_game
 
 markov_game = AlternatorMDP()
 
-# policy1 = (lambda x: ACTIONS[x.selection[1]]) # return teammate's previous action
+# policy1 = (lambda x: ACTIONS[x.selection[1]) # return teammate's previous action
 # policy2 = (lambda x: ACTIONS[(x.selection[1] + 1)%3]) # return cycling through own moves
 
 ## VISUALIZATIONS (Look at PyGame) TODO: Arnav / Mike
@@ -16,29 +16,36 @@ markov_game = AlternatorMDP()
 
 def create_agents(other_player):
 	this_player = (other_player + 1) % 2
+
+	### Fixed Policy Agents
+	# Minimax Agent
+	minimax = FixedPolicyAgent(policy=(lambda x: ACTIONS[1]), name='Minimax')
+	# Maximize Both Player's Payoffs
+	max_welfare1 = FixedPolicyAgent(policy=(lambda x: ACTIONS[(2-x.selection[this_player]) % 3] if x.selection[this_player] != -1 else ACTIONS[0]), name='MaxWelfare')
+	max_welfare2 = FixedPolicyAgent(policy=(lambda x: ACTIONS[(2-x.selection[this_player]) % 3] if x.selection[this_player] != -1 else ACTIONS[2]), name='MaxWelfare2')
+	# Maximize Own Payoffs
+	max_self = FixedPolicyAgent(policy=(lambda x: ACTIONS[0]), name='MaxSelf')
+	# Maximize Their Payoffs
+	max_other = FixedPolicyAgent(policy=(lambda x: ACTIONS[2]), name='MaxOther')
+	
+	### Adaptive Agents TODO: Tim / Najma
+	# Tit for Tat
+	tit_for_tat = FixedPolicyAgent(policy=(lambda x: x.selection[1]), name='Tit for Tat')
+	# Tit for 2 Tats 
+
+	# Agent that adapts over time to become more efficient
+	efficiency = FixedPolicyAgent(policy=(lambda x:  minimax.policy(x) if x.round < 5 else tit_for_tat.policy(x) if x.round < 10 else max_welfare1.policy(x)), name='Tit for Tat'),
+
+	# Ficticious Play Agent
+
 	return [
-		### Fixed Policy Agents
-
-		# Minimax Agent
-		FixedPolicyAgent(policy=(lambda x: ACTIONS[1]), name='Minimax'),
-		# Maximize Both Player's Payoffs
-		FixedPolicyAgent(policy=(lambda x: ACTIONS[(2-x.selection[this_player]) % 3] if x.selection[this_player] != -1 else ACTIONS[0]), name='MaxWelfare'),
-		FixedPolicyAgent(policy=(lambda x: ACTIONS[(2-x.selection[this_player]) % 3] if x.selection[this_player] != -1 else ACTIONS[2]), name='MaxWelfare2'),
-		# Maximize Own Payoffs
-		FixedPolicyAgent(policy=(lambda x: ACTIONS[0]), name='MaxPlayer1'),
-		# Maximize Their Payoffs
-		FixedPolicyAgent(policy=(lambda x: ACTIONS[2]), name='MaxPlayer2'),
-
-
-		### Adaptive Agents TODO: Tim / Najma
-
-		# Ficticious Play Agent
-
-		# Agent that adapts over time to become more efficient
-
-		# Tit for Tat
-
-		# Tit for 2 Tats 
+		minimax,
+		max_welfare1,
+		max_welfare2,
+		max_self,
+	  max_other,
+	  tit_for_tat,
+		efficiency
 	]
 
 
