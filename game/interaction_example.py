@@ -124,7 +124,20 @@ markov_game.reset()
 state = markov_game.get_init_state()
 
 res = 0
-step_num = 50
+step_num = 5
+
+player_names = []
+for agent in chief_player.player_pool.agents:
+	player_names.append(agent.name)
+
+x_vals_probabilities = list(range(len(player_names)))
+plt.clf()
+plt.title("Bayesian Probabilities over Agents")
+plt.xlabel("Agents")
+plt.ylabel("Probabilities")
+plt.bar(x_vals_probabilities, chief_player.current_bayesian_values, tick_label=player_names)
+plt.draw()
+plt.pause(0.2) # plt requires a small delay to actually plot
 
 for steps in range(step_num):
 	action_dict = dict()
@@ -173,6 +186,7 @@ for steps in range(step_num):
 
 	pygame.display.flip()
 
+	agent_action = None
 	for a in agents:
 		if a == "Human":
 			# get action
@@ -186,14 +200,20 @@ for steps in range(step_num):
 					if event.type == MOUSEBUTTONUP and clicked:
 						mouse_pos = pygame.mouse.get_pos()
 						chosen_action = action_choice(mouse_pos)
-						print(chosen_action, mouse_pos)
+						# print(chosen_action, mouse_pos)
 						clicked = False
 
-			action_dict[a] = chosen_action 
+				# allows you to dynamically resize the figure in a new window (helpful for viewing all labels)
+				plt.draw()
+				plt.pause(0.2)
+
+			action_dict[a] = chosen_action
 		else:
 			agent_reward = reward_dict[a.name]
 			agent_action = a.act(state, agent_reward)
 			action_dict[a.name] = agent_action
+
+	print("Human: {}, Agent: {}".format(chosen_action, agent_action))
 
 	correct_val = int(prediction == action_dict["Human"])
 	total_correct += correct_val
@@ -207,14 +227,23 @@ for steps in range(step_num):
 
 	state = next_state
 
+	plt.clf()
+	plt.title("Bayesian Probabilities over Agents")
+	plt.xlabel("Agents")
+	plt.ylabel("Probabilities")
+	plt.bar(x_vals_probabilities, chief_player.current_bayesian_values, tick_label=player_names)
+	plt.draw()
+	plt.pause(0.2) # plt requires a small delay to actually plot
 
 
 xvals = list(range(len(correct_predictions_over_time)))
 
+plt.figure(2)
 plt.plot(xvals, correct_predictions_over_time, 'bo')
 plt.gca().set_ylim(0,1)
 plt.title("Correct or not for each step")
-plt.show()
+
+plt.figure(3)
 plt.plot(xvals, average_accuracy_till_now)
 plt.title("Average accuracy till each step")
 plt.show()
