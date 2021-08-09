@@ -29,11 +29,11 @@ def create_agents(other_player):
 	max_self = FixedPolicyAgent(policy=(lambda x: ACTIONS[0]), name='MaxSelf')
 	# Maximize Their Payoffs
 	max_other = FixedPolicyAgent(policy=(lambda x: ACTIONS[2]), name='MaxOther')
-	
+
 	### Adaptive Agents TODO: Tim / Najma
 	# Tit for Tat
-	tit_for_tat = FixedPolicyAgent(policy=(lambda x: ACTIONS[x.selection[other_player]]), name='Tit for Tat')
-	# Tit for 2 Tats 
+	tit_for_tat = FixedPolicyAgent(policy=(lambda x: ACTIONS[x.selection[other_player]] if x.selection[other_player] != -1 else ACTIONS[random.randint(0, 2)]), name='Tit for Tat')
+	# Tit for 2 Tats
 
 	# Agent that adapts over time to become more efficient
 	efficiency = FixedPolicyAgent(policy=(lambda x:  minimax.policy(x) if x.round < 5 else tit_for_tat.policy(x) if x.round < 10 else max_welfare1.policy(x)), name='Efficiency')
