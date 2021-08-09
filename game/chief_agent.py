@@ -66,8 +66,8 @@ class ChiefAgent(Agent):
 		self.bayesian_prior_init = bayesian_prior
 		self.prev_state = None
 		self.partner_idx = partner_idx
-		self.exploration_prob = 1.0
-		self.exploration_decrement = 0.02
+		self.exploration_prob = 0.7
+		self.exploration_decrement = 0.05
 		self.exploration_min = 0.3
 
 		if bayesian_prior:
