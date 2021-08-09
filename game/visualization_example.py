@@ -6,6 +6,7 @@ from collections import defaultdict
 from simple_rl.run_experiments import play_markov_game
 import matplotlib.pyplot as plt
 from tabulate import tabulate
+from numpy import random
 
 markov_game = AlternatorMDP()
 
@@ -31,7 +32,7 @@ def create_agents(other_player):
 	
 	### Adaptive Agents TODO: Tim / Najma
 	# Tit for Tat
-	tit_for_tat = FixedPolicyAgent(policy=(lambda x: x.selection[1]), name='Tit for Tat')
+	tit_for_tat = FixedPolicyAgent(policy=(lambda x: ACTIONS[x.selection[other_player]]), name='Tit for Tat')
 	# Tit for 2 Tats 
 
 	# Agent that adapts over time to become more efficient
@@ -50,12 +51,14 @@ def create_agents(other_player):
 	}
 
 human_idx = 1
-pool_agents = create_agents(human_idx)
+pool_agents = create_agents(1 - human_idx) # other player from human point of view is us
 player_pool = PlayerPool(list(pool_agents.values()), sample_size=10)
+mirrored_agents = create_agents(human_idx) # other player from our point of view is human
+mirrored_pool = PlayerPool(list(mirrored_agents.values()), sample_size=10)
 
-human_strategy = "max_welfare1"
+human_strategy = "tit_for_tat"
 human_teammate = deepcopy(pool_agents[human_strategy])
-chief_player = ChiefAgent(actions=markov_game.get_actions(), name="chief", player_pool=player_pool, partner_idx=human_idx)
+chief_player = ChiefAgent(actions=markov_game.get_actions(), name="chief", player_pool=player_pool, mirrored_player_pool=mirrored_pool, partner_idx=human_idx, likelihood_threshold=0.6)
 
 probabilities_over_time = dict(zip(list(pool_agents.keys()), [[]]*len(pool_agents)))
 print(probabilities_over_time)
@@ -80,34 +83,38 @@ def format_nums(L):
 
 	return LL
 
-for episode in range(10):
-	markov_game.reset()
-	state = markov_game.get_init_state()
 
-	res = 0
-	step_num = 50
+markov_game.reset()
+state = markov_game.get_init_state()
 
-	for steps in range(step_num):
-		action_dict = dict()
-		reward_dict = defaultdict(float)
+res = 0
+step_num = 200
 
-		prediction = chief_player.get_predicted_action(state)
+for step in range(step_num):
+	action_dict = dict()
+	reward_dict = defaultdict(float)
 
-		for a in agents:
-			agent_reward = reward_dict[a.name]
-			agent_action = a.act(state, agent_reward)
-			action_dict[a.name] = agent_action
+	prediction = chief_player.get_predicted_action(state)
 
-		correct_val = int(prediction == action_dict[human_teammate.name])
-		total_correct += correct_val
-		correct_predictions_over_time.append(correct_val)
-		average_accuracy_till_now.append(total_correct/len(correct_predictions_over_time))
+	for a in agents:
+		agent_reward = reward_dict[a.name]
+		agent_action = a.act(state, agent_reward)
 
-		reward_dict, next_state = markov_game.execute_agent_action(action_dict)
+		if a.name != "chief" and random.random() < .2: # adding noise
+			agent_action = random.choice(["A","B","C"])
 
-		state = next_state
+		action_dict[a.name] = agent_action
 
-	print("========= AFTER EPISODE:", episode, "==========")
+	correct_val = int(prediction == action_dict[human_teammate.name])
+	total_correct += correct_val
+	correct_predictions_over_time.append(correct_val)
+	average_accuracy_till_now.append(total_correct/len(correct_predictions_over_time))
+
+	reward_dict, next_state = markov_game.execute_agent_action(action_dict)
+
+	state = next_state
+
+	print("========= AFTER STEP:", step, "==========")
 	table = [["agent options"] + list(pool_agents.keys()),
              ["bayesian inference"] + format_nums(list(chief_player.current_bayesian_values)),
              ["MLE values"] + format_nums(list(chief_player.current_MLE_values))]
@@ -121,5 +128,6 @@ plt.gca().set_ylim(0,1)
 plt.title("Correct or not for each step")
 plt.show()
 plt.plot(xvals, average_accuracy_till_now)
+plt.gca().set_ylim(0,1)
 plt.title("Average accuracy till each step")
 plt.show()

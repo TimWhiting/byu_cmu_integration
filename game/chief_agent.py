@@ -3,8 +3,6 @@ import numpy as np
 
 from simple_rl.agents import Agent, QLearningAgent, RandomAgent
 
-BEST_RESPONSES = {"A":"B", "B":"A", "C":"A"} # This will have to be modified for the actual project
-
 class PlayerPool(object):
 	def __init__(self, agents, sample_size=100, probs_method='sampling'):
 		self.size = len(agents)
@@ -56,10 +54,11 @@ class PlayerPool(object):
 
 
 class ChiefAgent(Agent):
-	def __init__(self, actions, name, player_pool, gamma=0.99, bayesian_prior=None, likelihood_threshold=0.3, partner_idx=1):
+	def __init__(self, actions, name, player_pool, mirrored_player_pool, gamma=0.99, bayesian_prior=None, likelihood_threshold=0.3, partner_idx=1):
 		Agent.__init__(self, name=name, actions=actions, gamma=gamma)
 
 		self.player_pool = player_pool # Needs to be of type PlayerPool
+		self.mirrored_player_pool = mirrored_player_pool
 		self.pool_size = self.player_pool.get_size()
 		self.current_MLE_values = np.zeros(self.pool_size)
 		self.moves_recorded = 0
@@ -67,6 +66,9 @@ class ChiefAgent(Agent):
 		self.bayesian_prior_init = bayesian_prior
 		self.prev_state = None
 		self.partner_idx = partner_idx
+		self.exploration_prob = 1.0
+		self.exploration_decrement = 0.02
+		self.exploration_min = 0.3
 
 		if bayesian_prior:
 			self.current_bayesian_values = bayesian_prior
@@ -105,15 +107,20 @@ class ChiefAgent(Agent):
 		return self._best_response(proposed_model_idx, state)
 
 	def _best_response(self, proposed_model_idx, state):
-		predicted_action = self.player_pool.get_agent_action(proposed_model_idx, state)
+		mirrored_action = self.mirrored_player_pool.get_agent_action(proposed_model_idx, state)
 
-		# returning best response to each prediction
-		return BEST_RESPONSES[predicted_action]
+		if (np.random.random() < self.exploration_prob):
+			return np.random.choice(self.actions)
+
+		self.exploration_prob = max(self.exploration_prob - self.exploration_decrement, self.exploration_min)
+
+		# returning action from mirrored agent
+		return mirrored_action
 
 	def get_predicted_action(self, state):
 		proposed_model_idx = np.argmax(self.current_bayesian_values)
 
-		if (self.current_MLE_values[proposed_model_idx] < self.likelihood_threshold):
+		if (self.current_MLE_values[proposed_model_idx] < self.likelihood_threshold*np.max(self.current_MLE_values)):
 			proposed_model_idx = np.argmax(self.current_MLE_values)
 
 		return self.player_pool.get_agent_action(proposed_model_idx, state)
