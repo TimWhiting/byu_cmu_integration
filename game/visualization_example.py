@@ -1,4 +1,5 @@
 from chief_agent import PlayerPool, ChiefAgent
+from baseline_agent import BaselineAgent
 from alternator import *
 from simple_rl.agents import QLearningAgent, FixedPolicyAgent
 from copy import deepcopy
@@ -56,7 +57,7 @@ player_pool = PlayerPool(list(pool_agents.values()), sample_size=10)
 mirrored_agents = create_agents(human_idx) # other player from our point of view is human
 mirrored_pool = PlayerPool(list(mirrored_agents.values()), sample_size=10)
 
-human_strategy = "tit_for_tat"
+human_strategy = "max_other"
 human_teammate = deepcopy(pool_agents[human_strategy])
 chief_player = ChiefAgent(actions=markov_game.get_actions(), name="chief", player_pool=player_pool, mirrored_player_pool=mirrored_pool, partner_idx=human_idx, likelihood_threshold=0.6)
 
@@ -83,6 +84,10 @@ def format_nums(L):
 
 	return LL
 
+baseline_player = BaselineAgent(markov_game.get_actions(), "baseline", partner_idx=human_idx)
+baseline_accuracy_over_time = []
+total_baseline = 0
+
 
 markov_game.reset()
 state = markov_game.get_init_state()
@@ -104,6 +109,11 @@ for step in range(step_num):
 			agent_action = random.choice(["A","B","C"])
 
 		action_dict[a.name] = agent_action
+
+	baseline_player.act(state, agent_reward)
+	baseline_prediction = baseline_player.get_predicted_action(state)
+	total_baseline += int(baseline_prediction == action_dict[human_teammate.name])
+	baseline_accuracy_over_time.append(total_baseline/(len(correct_predictions_over_time) + 1))
 
 	correct_val = int(prediction == action_dict[human_teammate.name])
 	total_correct += correct_val
@@ -128,6 +138,7 @@ plt.gca().set_ylim(0,1)
 plt.title("Correct or not for each step")
 plt.show()
 plt.plot(xvals, average_accuracy_till_now)
+plt.plot(xvals, baseline_accuracy_over_time, color="red")
 plt.gca().set_ylim(0,1)
 plt.title("Average accuracy till each step")
 plt.show()
