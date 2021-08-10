@@ -134,3 +134,43 @@ class ChiefAgent(Agent):
 			self.current_bayesian_values = bayesian_prior
 		else:
 			self.current_bayesian_values = np.ones(self.pool_size)/self.pool_size
+
+
+class ChiefAgentWithAAT(ChiefAgent):
+	def __init__(self, actions, name, player_pool, mirrored_player_pool, gamma=0.99, bayesian_prior=None, likelihood_threshold=0.3, partner_idx=1):
+		ChiefAgent.__init__(self, actions, name, player_pool, mirrored_player_pool, gamma, bayesian_prior, likelihood_threshold, partner_idx)
+
+		self.input_assumptions = []
+		self.output_assumptions = []
+		self.alignment_profile = []
+
+	def performance_estimation(self):
+		# fill in with function of baseline and alignment profile
+		baseline_estimation = self.player_pool.current_MLE_values[np.argmax(self.player_pool.current_bayesian_values)]
+
+		return 
+
+	def _add_to_profile(self, state, action, result):
+		profile_item = []
+
+		for a in self.input_assumptions:
+			profile_item.append(int(self.input_true(a, state)))
+
+		for a in self.output_assumptions:
+			profile_item.append(int(self.output_true(a,state,action,result)))
+
+	def act(self, state, reward):
+		prev_state = self.prev_state
+		prev_action = self.actions[state.selection[self.partner_idx]]
+		curr_state = state
+
+		self._add_to_profile(prev_state, prev_action, curr_state)
+
+		return ChiefAgent.act(self, state, reward)
+
+	def reset(self):
+		self.input_assumptions = []
+		self.output_assumptions = []
+		self.alignment_profile = []
+
+		ChiefAgent.reset(self)
