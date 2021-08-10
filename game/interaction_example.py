@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import sys, pygame
 from tabulate import tabulate
 from pygame.locals import *
+from baseline_agent import BaselineAgent
 
 markov_game = AlternatorMDP()
 pygame.init() # https://www.pygame.org/docs/tut/PygameIntro.html
@@ -119,6 +120,9 @@ else:
 total_rewards = defaultdict(float)
 reward_dict = defaultdict(float)
 
+baseline_player = BaselineAgent(markov_game.get_actions(), "baseline", partner_idx=human_idx)
+baseline_accuracy_over_time = []
+total_baseline = 0
 
 markov_game.reset()
 state = markov_game.get_init_state()
@@ -130,6 +134,7 @@ player_names = []
 for agent in chief_player.player_pool.agents:
 	player_names.append(agent.name)
 
+plt_pause = 0.2
 x_vals_probabilities = list(range(len(player_names)))
 plt.clf()
 plt.title("Bayesian Probabilities over Agents")
@@ -137,7 +142,7 @@ plt.xlabel("Agents")
 plt.ylabel("Probabilities")
 plt.bar(x_vals_probabilities, chief_player.current_bayesian_values, tick_label=player_names)
 plt.draw()
-plt.pause(0.2) # plt requires a small delay to actually plot
+plt.pause(plt_pause) # plt requires a small delay to actually plot
 
 for steps in range(step_num):
 	action_dict = dict()
@@ -205,7 +210,7 @@ for steps in range(step_num):
 
 				# allows you to dynamically resize the figure in a new window (helpful for viewing all labels)
 				plt.draw()
-				plt.pause(0.2)
+				plt.pause(plt_pause)
 
 			action_dict[a] = chosen_action
 		else:
@@ -214,6 +219,12 @@ for steps in range(step_num):
 			action_dict[a.name] = agent_action
 
 	print("Human: {}, Agent: {}".format(chosen_action, agent_action))
+
+	baseline_player.act(state, agent_reward)
+	baseline_prediction = baseline_player.get_predicted_action(state)
+	total_baseline += int(baseline_prediction == action_dict["Human"])
+	baseline_accuracy_over_time.append(total_baseline/(len(correct_predictions_over_time) + 1))
+
 
 	correct_val = int(prediction == action_dict["Human"])
 	total_correct += correct_val
@@ -233,17 +244,26 @@ for steps in range(step_num):
 	plt.ylabel("Probabilities")
 	plt.bar(x_vals_probabilities, chief_player.current_bayesian_values, tick_label=player_names)
 	plt.draw()
-	plt.pause(0.2) # plt requires a small delay to actually plot
+	plt.pause(plt_pause) # plt requires a small delay to actually plot
 
 
 xvals = list(range(len(correct_predictions_over_time)))
 
 plt.figure(2)
-plt.plot(xvals, correct_predictions_over_time, 'bo')
+plt.plot(xvals, correct_predictions_over_time, 'bo', markersize=12)
 plt.gca().set_ylim(0,1)
+plt.xlabel("Step")
+plt.ylabel("Correctness of Prediction")
+plt.xticks(ticks=xvals)
+plt.yticks(ticks=[0, 1], labels=["False", "True"])
 plt.title("Correct or not for each step")
 
 plt.figure(3)
 plt.plot(xvals, average_accuracy_till_now)
+plt.plot(xvals, baseline_accuracy_over_time, color="red")
+plt.legend(['CHIEF', 'Baseline'])
 plt.title("Average accuracy till each step")
+plt.xticks(ticks=xvals)
+plt.xlabel("Step")
+plt.ylabel("Average accuracy")
 plt.show()
