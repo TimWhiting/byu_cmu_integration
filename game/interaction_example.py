@@ -9,6 +9,8 @@ import sys, pygame
 from tabulate import tabulate
 from pygame.locals import *
 from baseline_agent import BaselineAgent
+import os
+import pickle
 
 markov_game = AlternatorMDP()
 pygame.init() # https://www.pygame.org/docs/tut/PygameIntro.html
@@ -144,33 +146,40 @@ plt.bar(x_vals_probabilities, chief_player.current_bayesian_values, tick_label=p
 plt.draw()
 plt.pause(plt_pause) # plt requires a small delay to actually plot
 
-for steps in range(step_num):
+agent_moves = []
+human_moves = []
+
+for steps in range(1, step_num + 2):
 	action_dict = dict()
 
 	prediction = chief_player.get_predicted_action(state)
 
 	screen.fill([255,255,255])
 
+	text_round = font.render("Round {}/{}".format(max(steps - 1, 1), step_num), 1, (5,5,5))
+	text_round_rect = text_round.get_rect(centerx=170, centery=10)
+	screen.blit(text_round, text_round_rect)
+
 	text1 = font.render("your selection", 1, (5,5,5))
 	text2 = font.render("opponent's selection", 1, (5,5,5))
-	text1rect = text1.get_rect(centerx=255, centery=10)
-	text2rect = text2.get_rect(centerx=65, centery=10)
+	text1rect = text1.get_rect(centerx=255, centery=50)
+	text2rect = text2.get_rect(centerx=65, centery=50)
 
 	screen.blit(text1, text1rect)
 	screen.blit(text2, text2rect)
 
 	rewardtext1 = font.render("your reward: " + str(reward_dict["Human"]), 1, (5,5,5))
 	rewardtext2 = font.render("their reward: " + str(reward_dict["chief"]), 1, (5,5,5))
-	text1rect = text1.get_rect(centerx=235, centery=120)
-	text2rect = text2.get_rect(centerx=65, centery=120)
+	text1rect = text1.get_rect(centerx=235, centery=150)
+	text2rect = text2.get_rect(centerx=65, centery=150)
 
 	screen.blit(rewardtext1, text1rect)
 	screen.blit(rewardtext2, text2rect)
 
 	totalrewardtext1 = font.render("your total reward: " + str(total_rewards["Human"]), 1, (5,5,5))
 	totalrewardtext2 = font.render("their total reward: " + str(total_rewards["chief"]), 1, (5,5,5))
-	text1rect = text1.get_rect(centerx=235, centery=150)
-	text2rect = text2.get_rect(centerx=65, centery=150)
+	text1rect = text1.get_rect(centerx=235, centery=180)
+	text2rect = text2.get_rect(centerx=65, centery=180)
 
 	screen.blit(totalrewardtext1, text1rect)
 	screen.blit(totalrewardtext2, text2rect)
@@ -182,14 +191,17 @@ for steps in range(step_num):
 
 	if state.selection[human_idx] != -1:
 		img, rect = list(buttons.values())[state.selection[1 - human_idx]]
-		new_rect = pygame.Rect(40, 40, 50, 80)
+		new_rect = pygame.Rect(40, 70, 50, 80)
 		screen.blit(img, new_rect)
 
 		img, rect = list(buttons.values())[state.selection[human_idx]]
-		new_rect = pygame.Rect(230, 40, 50, 80)
+		new_rect = pygame.Rect(230, 70, 50, 80)
 		screen.blit(img, new_rect)
 
 	pygame.display.flip()
+
+	if steps == step_num + 1:
+		break
 
 	agent_action = None
 	for a in agents:
@@ -208,17 +220,23 @@ for steps in range(step_num):
 						# print(chosen_action, mouse_pos)
 						clicked = False
 
+					if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+						# Quit.
+						pygame.display.quit()
+
 				# allows you to dynamically resize the figure in a new window (helpful for viewing all labels)
 				plt.draw()
 				plt.pause(plt_pause)
 
 			action_dict[a] = chosen_action
+			human_moves.append(chosen_action)
 		else:
 			agent_reward = reward_dict[a.name]
 			agent_action = a.act(state, agent_reward)
 			action_dict[a.name] = agent_action
+			agent_moves.append(agent_action)
 
-	print("Human: {}, Agent: {}".format(chosen_action, agent_action))
+	print("Agent: {}, Human: {}".format(agent_action, chosen_action))
 
 	baseline_player.act(state, agent_reward)
 	baseline_prediction = baseline_player.get_predicted_action(state)
@@ -246,6 +264,13 @@ for steps in range(step_num):
 	plt.draw()
 	plt.pause(plt_pause) # plt requires a small delay to actually plot
 
+
+data_dir = './user_data/'
+os.makedirs(data_dir, exist_ok=True)
+n_participants = len(os.listdir(data_dir))
+
+with open(data_dir + 'participant' + str(n_participants + 1) + '.pickle', 'wb') as f:
+	pickle.dump((agent_moves, human_moves, correct_predictions_over_time, average_accuracy_till_now, baseline_accuracy_over_time), f)
 
 xvals = list(range(len(correct_predictions_over_time)))
 
