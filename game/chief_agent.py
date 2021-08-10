@@ -137,11 +137,11 @@ class ChiefAgent(Agent):
 
 
 class ChiefAgentWithAAT(ChiefAgent):
-	def __init__(self, actions, name, player_pool, mirrored_player_pool, gamma=0.99, bayesian_prior=None, likelihood_threshold=0.3, partner_idx=1):
+	def __init__(self, input_assumptions, output_assumptions, actions, name, player_pool, mirrored_player_pool, gamma=0.99, bayesian_prior=None, likelihood_threshold=0.3, partner_idx=1):
 		ChiefAgent.__init__(self, actions, name, player_pool, mirrored_player_pool, gamma, bayesian_prior, likelihood_threshold, partner_idx)
 
-		self.input_assumptions = []
-		self.output_assumptions = []
+		self.input_assumptions = input_assumptions
+		self.output_assumptions = output_assumptions
 		self.alignment_profile = []
 
 	def performance_estimation(self):
@@ -153,11 +153,14 @@ class ChiefAgentWithAAT(ChiefAgent):
 	def _add_to_profile(self, state, action, result):
 		profile_item = []
 
+		# input assumptions are lambda state: true/false
+		# output assumptions are lambda state, action result: true/false
+
 		for a in self.input_assumptions:
-			profile_item.append(int(self.input_true(a, state)))
+			profile_item.append(int(a(state)))
 
 		for a in self.output_assumptions:
-			profile_item.append(int(self.output_true(a,state,action,result)))
+			profile_item.append(int(a(state, action, result)))
 
 	def act(self, state, reward):
 		prev_state = self.prev_state
