@@ -62,95 +62,103 @@ player_pool = PlayerPool(list(pool_agents.values()), sample_size=10)
 mirrored_agents = create_agents(human_idx) # other player from our point of view is human
 mirrored_pool = PlayerPool(list(mirrored_agents.values()), sample_size=10)
 
+n_iterations = 10
 epsilons = [0, 0.3, 0.5]
 
+data_dir = './training_data/'
+os.makedirs(data_dir, exist_ok=True)
+
+with open(data_dir + 'training_data.pickle', 'rb') as f:
+	training_data = pickle.load(f)
+
 training_data = []
-for human_strategy in pool_agents.keys():
-	print('Strategy: {}'.format(human_strategy))
+for iter in range(n_iterations):
+	for human_strategy in pool_agents.keys():
+		print('Strategy: {}'.format(human_strategy))
 
-	for epsilon in epsilons:
-		print('Epsilon: {}'.format(epsilon))
+		for epsilon in epsilons:
+			print('Epsilon: {}'.format(epsilon))
 
-		human_teammate = deepcopy(pool_agents[human_strategy])
+			human_teammate = deepcopy(pool_agents[human_strategy])
 
-		output_assumptions = [(lambda chief,s,a,next_s: chief.get_predicted_action(s) == chief.actions[next_s.selection[chief.partner_idx]])]
-		estimation_model = lambda baseline,num_rounds,average_accuracy : (baseline + num_rounds*average_accuracy)/(num_rounds + 1)
+			output_assumptions = [(lambda chief,s,a,next_s: chief.get_predicted_action(s) == chief.actions[next_s.selection[chief.partner_idx]])]
+			estimation_model = lambda baseline,num_rounds,average_accuracy : (baseline + num_rounds*average_accuracy)/(num_rounds + 1)
 
-		chief_player = ChiefAgentWithAAT(estimation_model=estimation_model, output_assumptions=output_assumptions, actions=markov_game.get_actions(), name="chief", player_pool=player_pool, mirrored_player_pool=mirrored_pool, partner_idx=human_idx, likelihood_threshold=0.6)
+			chief_player = ChiefAgentWithAAT(estimation_model=estimation_model, output_assumptions=output_assumptions, actions=markov_game.get_actions(), name="chief", player_pool=player_pool, mirrored_player_pool=mirrored_pool, partner_idx=human_idx, likelihood_threshold=0.6)
 
-		probabilities_over_time = dict(zip(list(pool_agents.keys()), [[]]*len(pool_agents)))
-		# print(probabilities_over_time)
-		correct_predictions_over_time = []
-		total_correct = 0
-		average_accuracy_till_now = []
+			probabilities_over_time = dict(zip(list(pool_agents.keys()), [[]]*len(pool_agents)))
+			# print(probabilities_over_time)
+			correct_predictions_over_time = []
+			total_correct = 0
+			average_accuracy_till_now = []
 
-		# print("Setup done")
-		# print("Index of teammate:", human_idx)
+			# print("Setup done")
+			# print("Index of teammate:", human_idx)
 
-		# execution
-		if human_idx == 0:
-			agents = [human_teammate, chief_player]
-		else:
-			agents = [chief_player, human_teammate]
+			# execution
+			if human_idx == 0:
+				agents = [human_teammate, chief_player]
+			else:
+				agents = [chief_player, human_teammate]
 
-		def format_nums(L):
-			LL = []
+			def format_nums(L):
+				LL = []
 
-			for l in L:
-				LL.append(round(l,3))
+				for l in L:
+					LL.append(round(l,3))
 
-			return LL
+				return LL
 
-		baseline_player = BaselineAgent(markov_game.get_actions(), "baseline", partner_idx=human_idx)
-		baseline_accuracy_over_time = []
-		total_baseline = 0
+			baseline_player = BaselineAgent(markov_game.get_actions(), "baseline", partner_idx=human_idx)
+			baseline_accuracy_over_time = []
+			total_baseline = 0
 
 
-		markov_game.reset()
-		state = markov_game.get_init_state()
+			markov_game.reset()
+			state = markov_game.get_init_state()
 
-		res = 0
-		step_num = 40
+			res = 0
+			step_num = 40
 
-		for step in range(step_num):
-			action_dict = dict()
-			reward_dict = defaultdict(float)
+			for step in range(step_num):
+				action_dict = dict()
+				reward_dict = defaultdict(float)
 
-			prediction = chief_player.get_predicted_action(state)
+				prediction = chief_player.get_predicted_action(state)
 
-			for a in agents:
-				agent_reward = reward_dict[a.name]
-				agent_action = a.act(state, agent_reward)
+				for a in agents:
+					agent_reward = reward_dict[a.name]
+					agent_action = a.act(state, agent_reward)
 
-				if a.name != "chief" and random.random() < epsilon: # adding noise
-					agent_action = random.choice(["A","B","C"])
+					if a.name != "chief" and random.random() < epsilon: # adding noise
+						agent_action = random.choice(["A","B","C"])
 
-				action_dict[a.name] = agent_action
+					action_dict[a.name] = agent_action
 
-			baseline_player.act(state, agent_reward)
-			baseline_prediction = baseline_player.get_predicted_action(state)
-			total_baseline += int(baseline_prediction == action_dict[human_teammate.name])
-			baseline_accuracy_over_time.append(total_baseline/(len(correct_predictions_over_time) + 1))
+				baseline_player.act(state, agent_reward)
+				baseline_prediction = baseline_player.get_predicted_action(state)
+				total_baseline += int(baseline_prediction == action_dict[human_teammate.name])
+				baseline_accuracy_over_time.append(total_baseline/(len(correct_predictions_over_time) + 1))
 
-			correct_val = int(prediction == action_dict[human_teammate.name])
-			total_correct += correct_val
-			correct_predictions_over_time.append(correct_val)
-			average_accuracy_till_now.append(total_correct/len(correct_predictions_over_time))
+				correct_val = int(prediction == action_dict[human_teammate.name])
+				total_correct += correct_val
+				correct_predictions_over_time.append(correct_val)
+				average_accuracy_till_now.append(total_correct/len(correct_predictions_over_time))
 
-			performance_features = chief_player.obtain_performance_features()
-			# print("-----PERFORMANCE ASSESSMENT-----")
-			# print("assessment value:",round(estimation_model(*performance_features), 3))
+				performance_features = chief_player.obtain_performance_features()
+				# print("-----PERFORMANCE ASSESSMENT-----")
+				# print("assessment value:",round(estimation_model(*performance_features), 3))
 
-			reward_dict, next_state = markov_game.execute_agent_action(action_dict)
+				reward_dict, next_state = markov_game.execute_agent_action(action_dict)
 
-			state = next_state
+				state = next_state
 
-			training_data.append(performance_features)
+				training_data.append(performance_features)
 
-		final_performance = average_accuracy_till_now[-1]
+			final_performance = average_accuracy_till_now[-1]
 
-		for i in range(1, step_num + 1):
-			training_data[-i].append(final_performance)
+			for i in range(1, step_num + 1):
+				training_data[-i].append(final_performance)
 
 data_dir = './training_data/'
 os.makedirs(data_dir, exist_ok=True)
