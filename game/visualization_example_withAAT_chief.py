@@ -20,6 +20,8 @@ markov_game = AlternatorMDP()
 def create_agents(other_player):
 	this_player = (other_player + 1) % 2
 
+	rand = FixedPolicyAgent(policy=(lambda x: random.choice(ACTIONS)), name='Random')
+
 	### Fixed Policy Agents
 	# Minimax Agent
 	minimax = FixedPolicyAgent(policy=(lambda x: ACTIONS[1]), name='Minimax')
@@ -42,6 +44,7 @@ def create_agents(other_player):
 	# Ficticious Play Agent
 
 	return {
+		"random":rand,
 		"minimax":minimax,
 		"max_welfare1":max_welfare1,
 		"max_welfare2":max_welfare2,
