@@ -155,7 +155,7 @@ class ChiefAgentWithAAT(ChiefAgent):
 		if printflag:
 			print("baseline:",round(baseline_estimation,3),"||| number of rounds:",feature_1,"||| average accuracy",round(feature_2,3))
 
-		return baseline_estimation, feature_1, feature_2
+		return [baseline_estimation, feature_1, feature_2]
 
 	def _add_to_profile(self, state, action, result):
 		profile_item = []
