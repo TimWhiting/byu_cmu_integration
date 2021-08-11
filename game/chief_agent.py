@@ -91,6 +91,14 @@ class ChiefAgent(Agent):
 
 		self.moves_recorded += 1
 
+	def get_proposed_model_idx(self):
+		proposed_model_idx = np.argmax(self.current_bayesian_values)
+
+		if (self.current_MLE_values[proposed_model_idx] < self.likelihood_threshold):
+			proposed_model_idx = np.argmax(self.current_MLE_values)
+
+		return proposed_model_idx
+
 	def act(self, state, reward):
 		if self.prev_state:
 			self.record_teammate_action(self.prev_state, self.actions[state.selection[self.partner_idx]])
@@ -98,13 +106,7 @@ class ChiefAgent(Agent):
 		else:
 			self.prev_state = state
 
-		# can eventually use the reward to assess and modify our method of responding to our teammate
-		proposed_model_idx = np.argmax(self.current_bayesian_values)
-
-		if (self.current_MLE_values[proposed_model_idx] < self.likelihood_threshold):
-			proposed_model_idx = np.argmax(self.current_MLE_values)
-
-		return self._best_response(proposed_model_idx, state)
+		return self._best_response(self.get_proposed_model_idx(), state)
 
 	def _best_response(self, proposed_model_idx, state):
 		mirrored_action = self.mirrored_player_pool.get_agent_action(proposed_model_idx, state)
@@ -118,12 +120,7 @@ class ChiefAgent(Agent):
 		return mirrored_action
 
 	def get_predicted_action(self, state):
-		proposed_model_idx = np.argmax(self.current_bayesian_values)
-
-		if (self.current_MLE_values[proposed_model_idx] < self.likelihood_threshold*np.max(self.current_MLE_values)):
-			proposed_model_idx = np.argmax(self.current_MLE_values)
-
-		return self.player_pool.get_agent_action(proposed_model_idx, state)
+		return self.player_pool.get_agent_action(self.get_proposed_model_idx(), state)
 
 	def reset(self):
 		# don't need to reset playerpool, since we never update the agents inside it
@@ -136,31 +133,38 @@ class ChiefAgent(Agent):
 			self.current_bayesian_values = np.ones(self.pool_size)/self.pool_size
 
 
+
 class ChiefAgentWithAAT(ChiefAgent):
-	def __init__(self, input_assumptions, output_assumptions, actions, name, player_pool, mirrored_player_pool, gamma=0.99, bayesian_prior=None, likelihood_threshold=0.3, partner_idx=1):
+	def __init__(self, estimation_model, output_assumptions, actions, name, player_pool, mirrored_player_pool, gamma=0.99, bayesian_prior=None, likelihood_threshold=0.3, partner_idx=1):
 		ChiefAgent.__init__(self, actions, name, player_pool, mirrored_player_pool, gamma, bayesian_prior, likelihood_threshold, partner_idx)
 
-		self.input_assumptions = input_assumptions
 		self.output_assumptions = output_assumptions
 		self.alignment_profile = []
+		self.estimation_model = estimation_model
 
 	def performance_estimation(self):
 		# fill in with function of baseline and alignment profile
-		baseline_estimation = self.player_pool.current_MLE_values[np.argmax(self.player_pool.current_bayesian_values)]
+		baseline_estimation = self.current_MLE_values[self.get_proposed_model_idx()]
+		
+		if (len(self.alignment_profile) == 0):
+			return baseline_estimation
 
-		return 
+		feature_1 = len(self.alignment_profile)
+		feature_2 = np.mean(np.array(self.alignment_profile), axis=0)[0]
+
+		print("baseline:",round(baseline_estimation,3),"||| number of rounds:",feature_1,"||| average accuracy",round(feature_2,3))
+
+		return self.estimation_model(baseline_estimation, feature_1, feature_2)
 
 	def _add_to_profile(self, state, action, result):
 		profile_item = []
 
-		# input assumptions are lambda state: true/false
-		# output assumptions are lambda state, action result: true/false
-
-		for a in self.input_assumptions:
-			profile_item.append(int(a(state)))
+		# output assumptions are lambda state, action, result: true/false
 
 		for a in self.output_assumptions:
-			profile_item.append(int(a(state, action, result)))
+			profile_item.append(int(a(self, state, action, result)))
+
+		self.alignment_profile.append(profile_item)
 
 	def act(self, state, reward):
 		prev_state = self.prev_state
@@ -172,7 +176,6 @@ class ChiefAgentWithAAT(ChiefAgent):
 		return ChiefAgent.act(self, state, reward)
 
 	def reset(self):
-		self.input_assumptions = []
 		self.output_assumptions = []
 		self.alignment_profile = []
 
