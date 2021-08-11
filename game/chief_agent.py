@@ -142,19 +142,20 @@ class ChiefAgentWithAAT(ChiefAgent):
 		self.alignment_profile = []
 		self.estimation_model = estimation_model
 
-	def performance_estimation(self):
+	def obtain_performance_features(self, print=False):
 		# fill in with function of baseline and alignment profile
 		baseline_estimation = self.current_MLE_values[self.get_proposed_model_idx()]
-		
+
 		if (len(self.alignment_profile) == 0):
 			return baseline_estimation
 
 		feature_1 = len(self.alignment_profile)
 		feature_2 = np.mean(np.array(self.alignment_profile), axis=0)[0]
 
-		print("baseline:",round(baseline_estimation,3),"||| number of rounds:",feature_1,"||| average accuracy",round(feature_2,3))
+		if print:
+			print("baseline:",round(baseline_estimation,3),"||| number of rounds:",feature_1,"||| average accuracy",round(feature_2,3))
 
-		return self.estimation_model(baseline_estimation, feature_1, feature_2)
+		return round(baseline_estimation,3), feature_1, round(feature_2,3)
 
 	def _add_to_profile(self, state, action, result):
 		profile_item = []
