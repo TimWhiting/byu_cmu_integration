@@ -62,14 +62,11 @@ player_pool = PlayerPool(list(pool_agents.values()), sample_size=10)
 mirrored_agents = create_agents(human_idx) # other player from our point of view is human
 mirrored_pool = PlayerPool(list(mirrored_agents.values()), sample_size=10)
 
-n_iterations = 10
-epsilons = [0, 0.3, 0.5]
+n_iterations = 20
+epsilons = [0, 0.2, 0.3, 0.5, 0.7]
 
 data_dir = './training_data/'
 os.makedirs(data_dir, exist_ok=True)
-
-with open(data_dir + 'training_data.pickle', 'rb') as f:
-	training_data = pickle.load(f)
 
 training_data = []
 for iter in range(n_iterations):

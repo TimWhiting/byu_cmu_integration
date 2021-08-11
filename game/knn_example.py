@@ -1,14 +1,18 @@
 import pickle
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.model_selection import train_test_split, GridSearchCV
 import random
+import numpy as np
 
-k = 5
-n_samples = 4500
+k = 14
+n_samples = 15000
 
 data_dir = './training_data/'
 
 with open(data_dir + 'training_data.pickle', 'rb') as f:
 	training_data = pickle.load(f)
+
+print(len(training_data))
 
 # randomly select samples
 if n_samples < len(training_data):
@@ -21,8 +25,13 @@ else:
 X = [example[0:-1] for example in training_data_filtered]
 Y = [example[-1] for example in training_data_filtered]
 
-# fit a KNN regression
-knn = KNeighborsRegressor(n_neighbors=k)
-knn.fit(X, Y)
+train_x, test_x, train_y, test_y = train_test_split(X,Y,test_size=0.3)
 
-print(knn.predict([[1, 8, 0.75], [0.2, 8, 0.75]]))
+# fit a model
+parameters = {'weights':('uniform', 'distance'), 'n_neighbors':list(range(1,30))}
+template_model = KNeighborsRegressor()
+model = GridSearchCV(template_model, parameters, scoring="neg_mean_squared_error")
+model.fit(train_x,train_y)
+
+results = (test_y - model.predict(test_x))**2
+print(np.mean(results), np.max(results), np.min(results), np.var(results))
