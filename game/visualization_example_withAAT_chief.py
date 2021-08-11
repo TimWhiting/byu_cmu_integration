@@ -147,6 +147,11 @@ for human_strategy in pool_agents.keys():
 
 			training_data.append(performance_features)
 
+		final_performance = average_accuracy_till_now[-1]
+
+		for i in range(step_num):
+			training_data[-i].append(final_performance)
+
 data_dir = './training_data/'
 os.makedirs(data_dir, exist_ok=True)
 
