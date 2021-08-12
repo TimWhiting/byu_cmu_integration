@@ -147,13 +147,18 @@ for agent in chief_player.player_pool.agents:
 
 plt_pause = 0.2
 x_vals_probabilities = np.array(list(range(len(player_names))))
+
 plt.clf()
-plt.title("Bayesian Probabilities over Agents")
+plt.title("Likelihood Probabilities over Agents")
 plt.xlabel("Agents")
 plt.ylabel("Probabilities")
-plt.bar(x_vals_probabilities, chief_player.current_bayesian_values, tick_label=player_names)
+bayesian_bar = plt.bar(x_vals_probabilities, chief_player.current_bayesian_values, width=0.3, tick_label=player_names, color="blue", alpha=0.5)
+mle_bar = plt.bar(x_vals_probabilities + 0.3, chief_player.current_MLE_values, width=0.3, color="red", alpha=0.5)
+bayesian_bar[chief_player.get_proposed_model_idx()].set_alpha(1)
+mle_bar[chief_player.get_proposed_model_idx()].set_alpha(1)
+plt.legend(["Bayesian Probabilities", "Model Likelihood Probabilities"])
 plt.draw()
-plt.pause(plt_pause) # plt requires a small delay to actually plot
+plt.pause(plt_pause)  # plt requires a small delay to actually plot
 
 agent_moves = []
 human_moves = []
