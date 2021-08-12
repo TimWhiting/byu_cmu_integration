@@ -81,7 +81,7 @@ class ChiefAgent(Agent):
 	def record_teammate_action(self, state, action):
 		# State --> the state from the teammates perspective
 		# Action --> the action taken by our teammate from this state
-		probs = self.player_pool.get_probs(state, action)
+		probs = np.clip(self.player_pool.get_probs(state, action), .0001, 1)
 		self.current_MLE_values = (probs + self.current_MLE_values*self.moves_recorded)/(self.moves_recorded + 1)
 		denom = np.dot(probs, self.current_bayesian_values)
 		self.current_bayesian_values = probs*self.current_bayesian_values/np.clip(denom, .0001, 1)
