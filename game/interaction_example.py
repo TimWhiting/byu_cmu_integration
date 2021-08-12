@@ -1,4 +1,4 @@
-from chief_agent import PlayerPool, ChiefAgent
+from chief_agent import PlayerPool, ChiefAgent, ChiefAgentWithAAT
 from alternator import *
 from simple_rl.agents import QLearningAgent, FixedPolicyAgent
 from copy import deepcopy
@@ -9,6 +9,7 @@ import sys, pygame
 from tabulate import tabulate
 from pygame.locals import *
 from baseline_agent import BaselineAgent
+from numpy import random
 import os
 import pickle
 
@@ -57,12 +58,13 @@ def action_choice(action_coords):
 def create_agents(other_player):
 	this_player = (other_player + 1) % 2
 
+	rand = FixedPolicyAgent(policy=(lambda x : ACTIONS[random.choice([0,1,2])]), name="Random")
 	### Fixed Policy Agents
 	# Minimax Agent
 	minimax = FixedPolicyAgent(policy=(lambda x: ACTIONS[1]), name='Minimax')
 	# Maximize Both Player's Payoffs
-	max_welfare1 = FixedPolicyAgent(policy=(lambda x: ACTIONS[(2-x.selection[this_player]) % 3] if x.selection[this_player] != -1 else ACTIONS[0]), name='MaxWelfare')
-	max_welfare2 = FixedPolicyAgent(policy=(lambda x: ACTIONS[(2-x.selection[this_player]) % 3] if x.selection[this_player] != -1 else ACTIONS[2]), name='MaxWelfare2')
+	max_welfare1 = FixedPolicyAgent(policy=(lambda x: {0:ACTIONS[2], 2:ACTIONS[0], 1:random.choice([ACTIONS[0], ACTIONS[2]]), -1:ACTIONS[0]}[x.selection[this_player]]), name='MaxWelfare')
+	max_welfare2 = FixedPolicyAgent(policy=(lambda x: {0:ACTIONS[2], 2:ACTIONS[0], 1:random.choice([ACTIONS[0], ACTIONS[2]]), -1:ACTIONS[2]}[x.selection[this_player]]), name='MaxWelfare2')
 	# Maximize Own Payoffs
 	max_self = FixedPolicyAgent(policy=(lambda x: ACTIONS[0]), name='MaxSelf')
 	# Maximize Their Payoffs
@@ -76,9 +78,8 @@ def create_agents(other_player):
 	# Agent that adapts over time to become more efficient
 	efficiency = FixedPolicyAgent(policy=(lambda x:  minimax.policy(x) if x.round < 5 else tit_for_tat.policy(x) if x.round < 10 else max_welfare1.policy(x)), name='Efficiency')
 
-	# Ficticious Play Agent
-
 	return {
+		"random":rand,
 		"minimax":minimax,
 		"max_welfare1":max_welfare1,
 		"max_welfare2":max_welfare2,
@@ -94,12 +95,19 @@ player_pool = PlayerPool(list(pool_agents.values()), sample_size=10)
 
 mirrored_agents = create_agents(human_idx)
 mirrored_pool = PlayerPool(list(mirrored_agents.values()), sample_size=10)
-chief_player = ChiefAgent(actions=markov_game.get_actions(), name="chief", player_pool=player_pool, mirrored_player_pool=mirrored_pool, partner_idx=human_idx)
+output_assumptions = [(lambda chief,s,a,next_s: chief.get_predicted_action(s) == chief.actions[next_s.selection[chief.partner_idx]])]
+
+with open("trained_chief_estimation_model", 'rb') as f:
+	estimation_model = pickle.load(f)
+
+chief_player = ChiefAgentWithAAT(estimation_model=estimation_model, output_assumptions=output_assumptions, actions=markov_game.get_actions(), name="chief", player_pool=player_pool, mirrored_player_pool=mirrored_pool, partner_idx=human_idx, likelihood_threshold=0.6)
+
 
 probabilities_over_time = dict(zip(list(pool_agents.keys()), [[]]*len(pool_agents)))
 correct_predictions_over_time = []
 total_correct = 0
 average_accuracy_till_now = []
+performance_estimation_over_time = []
 
 print("Setup done")
 print("Index of teammate:", human_idx)
@@ -130,7 +138,7 @@ markov_game.reset()
 state = markov_game.get_init_state()
 
 res = 0
-step_num = 5
+step_num = 50
 
 player_names = []
 for agent in chief_player.player_pool.agents:
@@ -249,6 +257,8 @@ for steps in range(1, step_num + 2):
 	correct_predictions_over_time.append(correct_val)
 	average_accuracy_till_now.append(total_correct/len(correct_predictions_over_time))
 
+	performance_estimation_over_time.append(chief_player.performance_estimation())
+
 	reward_dict, next_state = markov_game.execute_agent_action(action_dict)
 
 	total_rewards["Human"] += reward_dict["Human"]
@@ -289,6 +299,17 @@ plt.plot(xvals, baseline_accuracy_over_time, color="red")
 plt.legend(['CHIEF', 'Baseline'])
 plt.title("Average accuracy till each step")
 plt.xticks(ticks=xvals)
+plt.gca().set_ylim(0,1)
 plt.xlabel("Step")
 plt.ylabel("Average accuracy")
+
+plt.figure(4)
+plt.plot(xvals, performance_estimation_over_time)
+plt.plot(xvals, [average_accuracy_till_now[-1]]*len(xvals), color="red")
+plt.gca().set_ylim(0,1)
+plt.legend(['Performance Estimation', 'Actual End Performance'])
+plt.title("Performance Estimation Over Time")
+plt.xticks(ticks=xvals)
+plt.xlabel("Step")
+plt.ylabel("Accuracy")
 plt.show()

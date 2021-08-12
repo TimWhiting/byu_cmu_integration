@@ -35,3 +35,6 @@ model.fit(train_x,train_y)
 
 results = (test_y - model.predict(test_x))**2
 print(np.mean(results), np.max(results), np.min(results), np.var(results))
+
+with open("trained_chief_estimation_model", 'wb') as f:
+	pickle.dump(model, f)

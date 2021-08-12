@@ -157,6 +157,9 @@ class ChiefAgentWithAAT(ChiefAgent):
 
 		return [baseline_estimation, feature_1, feature_2]
 
+	def performance_estimation(self):
+		return self.estimation_model.predict([self.obtain_performance_features()])[0]
+
 	def _add_to_profile(self, state, action, result):
 		profile_item = []
 
