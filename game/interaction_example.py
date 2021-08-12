@@ -10,6 +10,7 @@ from tabulate import tabulate
 from pygame.locals import *
 from baseline_agent import BaselineAgent
 from numpy import random
+import numpy as np
 import os
 import pickle
 
@@ -145,7 +146,7 @@ for agent in chief_player.player_pool.agents:
 	player_names.append(agent.name)
 
 plt_pause = 0.2
-x_vals_probabilities = list(range(len(player_names)))
+x_vals_probabilities = np.array(list(range(len(player_names))))
 plt.clf()
 plt.title("Bayesian Probabilities over Agents")
 plt.xlabel("Agents")
@@ -267,10 +268,12 @@ for steps in range(1, step_num + 2):
 	state = next_state
 
 	plt.clf()
-	plt.title("Bayesian Probabilities over Agents")
+	plt.title("Likelihood Probabilities over Agents")
 	plt.xlabel("Agents")
 	plt.ylabel("Probabilities")
-	plt.bar(x_vals_probabilities, chief_player.current_bayesian_values, tick_label=player_names)
+	plt.bar(x_vals_probabilities, chief_player.current_bayesian_values, width=0.3, tick_label=player_names, color="blue")
+	plt.bar(x_vals_probabilities + 0.3, chief_player.current_MLE_values, width=0.3, color="red")
+	plt.legend(["Bayesian Probabilities", "Model Likelihood Probabilities"])
 	plt.draw()
 	plt.pause(plt_pause) # plt requires a small delay to actually plot
 
