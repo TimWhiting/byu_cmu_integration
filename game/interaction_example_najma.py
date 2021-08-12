@@ -11,7 +11,7 @@ from pygame.locals import *
 from baseline_agent import BaselineAgent
 import os
 import pickle
-from gamesBfAltbk import gamesBf
+from gamesBfAlt import gamesBf
 
 
 markov_game = AlternatorMDP()
