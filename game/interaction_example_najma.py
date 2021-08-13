@@ -1,4 +1,4 @@
-from chief_agent import PlayerPool, ChiefAgent, ChiefAgentWithAAT
+#from chief_agent import PlayerPool, ChiefAgent, ChiefAgentWithAAT
 from alternator import *
 from simple_rl.agents import QLearningAgent, FixedPolicyAgent
 from copy import deepcopy
