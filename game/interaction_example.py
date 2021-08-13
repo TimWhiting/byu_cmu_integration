@@ -13,6 +13,10 @@ from numpy import random
 import numpy as np
 import os
 import pickle
+import matplotlib
+
+matplotlib.rcParams.update({'font.size': 15})
+
 
 markov_game = AlternatorMDP()
 pygame.init() # https://www.pygame.org/docs/tut/PygameIntro.html
@@ -64,8 +68,8 @@ def create_agents(other_player):
 	# Minimax Agent
 	minimax = FixedPolicyAgent(policy=(lambda x: ACTIONS[1]), name='Minimax')
 	# Maximize Both Player's Payoffs
-	max_welfare1 = FixedPolicyAgent(policy=(lambda x: {0:ACTIONS[2], 2:ACTIONS[0], 1:random.choice([ACTIONS[0], ACTIONS[2]]), -1:ACTIONS[0]}[x.selection[this_player]]), name='MaxWelfare')
-	max_welfare2 = FixedPolicyAgent(policy=(lambda x: {0:ACTIONS[2], 2:ACTIONS[0], 1:random.choice([ACTIONS[0], ACTIONS[2]]), -1:ACTIONS[2]}[x.selection[this_player]]), name='MaxWelfare2')
+	max_welfare1 = FixedPolicyAgent(policy=(lambda x: {0:ACTIONS[2], 2:ACTIONS[0], 1:random.choice([ACTIONS[0], ACTIONS[2]]), -1:ACTIONS[0]}[x.selection[this_player]]), name='MaxWelf')
+	max_welfare2 = FixedPolicyAgent(policy=(lambda x: {0:ACTIONS[2], 2:ACTIONS[0], 1:random.choice([ACTIONS[0], ACTIONS[2]]), -1:ACTIONS[2]}[x.selection[this_player]]), name='MaxWelf2')
 	# Maximize Own Payoffs
 	max_self = FixedPolicyAgent(policy=(lambda x: ACTIONS[0]), name='MaxSelf')
 	# Maximize Their Payoffs
@@ -251,7 +255,7 @@ for steps in range(1, step_num + 2):
 			action_dict[a.name] = agent_action
 			agent_moves.append(agent_action)
 
-	print("Agent: {}, Human: {}".format(agent_action, chosen_action))
+	print("Round {} | Agent: {}, Human: {}".format(steps, agent_action, chosen_action))
 
 	baseline_player.act(state, agent_reward)
 	baseline_prediction = baseline_player.get_predicted_action(state)
@@ -301,16 +305,16 @@ plt.plot(xvals, correct_predictions_over_time, 'bo', markersize=12)
 plt.gca().set_ylim(0,1)
 plt.xlabel("Step")
 plt.ylabel("Correctness of Prediction")
-plt.xticks(ticks=xvals)
+plt.xticks(ticks=list(range(0, step_num, 5)))
 plt.yticks(ticks=[0, 1], labels=["False", "True"])
-plt.title("Correct or not for each step")
+plt.title("Correctness of Prediction at Each Step")
 
 plt.figure(3)
 plt.plot(xvals, average_accuracy_till_now)
 plt.plot(xvals, baseline_accuracy_over_time, color="red")
 plt.legend(['CHIEF', 'Baseline'])
-plt.title("Average accuracy till each step")
-plt.xticks(ticks=xvals)
+plt.title("Average Accuracy till Each Step")
+plt.xticks(ticks=list(range(0, step_num, 5)))
 plt.gca().set_ylim(0,1)
 plt.xlabel("Step")
 plt.ylabel("Average accuracy")
@@ -319,9 +323,9 @@ plt.figure(4)
 plt.plot(xvals, performance_estimation_over_time)
 plt.plot(xvals, [average_accuracy_till_now[-1]]*len(xvals), color="red")
 plt.gca().set_ylim(0,1)
-plt.legend(['Performance Estimation', 'Actual End Performance'])
-plt.title("Performance Estimation Over Time")
-plt.xticks(ticks=xvals)
+plt.legend(['Estimated Total Performance', 'Actual Total Performance'])
+plt.title("Performance Estimation at Each Step")
+plt.xticks(ticks=list(range(0, step_num, 5)))
 plt.xlabel("Step")
 plt.ylabel("Accuracy")
 plt.show()
