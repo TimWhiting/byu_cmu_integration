@@ -150,7 +150,7 @@ step_num = 50
 
 player_names = []
 #Bfagents= dict({"s0":"Maximin","s1":"Best Response","s2":"Bouncer","s3":"Follower-pure CX","s4":"Leader-pure CX","s5":"Follower-alt CX- AZ","s6":"Leader-alt CX- AZ","s7":"Follower-pure AZ","s8":"Leader pure AZ"})
-Bfagents= {"s0":"Maximin","s1":"Best Response","s2":"Bouncer","s3":"F-CX","s4":"L-CX","s5":"FA-CX-AZ","s6":"LA-CX-AZ","s7":"F-AZ","s8":"L-AZ"}
+Bfagents= {"s0":"Maximin","s1":"Best Response","s2":"Bouncer","s3":"-CA","s4":"L-CA","s5":"FAlt-CA-AC","s6":"LAlt-CA-AC","s7":"F-AC","s8":"L-AC"}
 player_names=list(Bfagents.values())
 
 
