@@ -1,0 +1,81 @@
+from block_game import ACTIONS, BlockGameState, P1, P2
+from block_game_tree import BlockGameTree, BlockGameTreeNode
+from collections import OrderedDict
+from simple_rl.agents.AgentClass import Agent
+from typing import Dict, Tuple
+
+
+"""
+Class that represents a fixed policy agent in the block game
+
+Parameters:
+eval_func (function): Function used for training the agent's policy.  The function should take
+    in a List[Tuple[Tuple[float, float], int]] representing the different (reward, action) pairs
+    that are possible to choose from, as well as an int representing the current turn.  The
+    function should return a Tuple[Tuple[float, float], int] representing the best (reward, action)
+    pair to pick
+name (str): The name of the agent/what policy it's using
+block_game_tree (BlockGameTree): Tree representing all of the possible game states
+
+"""
+
+
+class FixedPolicyBlockGameAgent(Agent):
+    def __init__(self, eval_func: 'function', name: str, block_game_tree: BlockGameTree) -> None:
+        Agent.__init__(self, name=name, actions=[])
+        self.eval_func = eval_func
+        self.name = name
+        self.policy: dict[str, 'str'] = {}
+        self._train(block_game_tree)
+
+    def _train(self, block_game_tree: BlockGameTree):
+        state_map = OrderedDict(
+            sorted(block_game_tree.state_id_map.items(), reverse=True))
+        ideal_reward_map: Dict[BlockGameTreeNode, Tuple[float, float]] = {}
+        for tree_node in state_map.values():
+            if tree_node.state.is_terminal():
+                p1_reward = tree_node.state.reward(P1)
+                p2_reward = tree_node.state.reward(P2)
+
+                ideal_reward_map[tree_node] = (p1_reward, p2_reward)
+                self.policy[str(tree_node.state)] = ACTIONS[-1]
+
+            else:
+                reward_action_pairs = [(ideal_reward_map[tree_node.action_to_children_map[i]], i)
+                                       for i in tree_node.action_to_children_map.keys()]
+                ideal_reward, ideal_action = self.eval_func(
+                    reward_action_pairs, tree_node.state.turn)
+
+                ideal_reward_map[tree_node] = ideal_reward
+                self.policy[str(tree_node.state)] = ACTIONS[ideal_action]
+
+    def act(self, state: BlockGameState, reward):
+        return self.policy[str(state)]
+
+    def __str__(self) -> str:
+        return str(self.name)
+
+
+"""
+Class that represents a dynamic policy agent in the block game
+
+Parameters:
+policy (function): Function used for picking an action given a state.  The function should take
+    in a BlockGameState and should return a str representing the action to pick (should be a 
+    valid action in the ACTIONS list found in block_game.py) 
+name (str): The name of the agent/what policy it's using
+
+"""
+
+
+class DynamicPolicyBlockGameAgent(Agent):
+    def __init__(self, policy: 'function', name: str) -> None:
+        Agent.__init__(self, name=name, actions=[])
+        self.policy = policy
+        self.name = name
+
+    def act(self, state: BlockGameState, reward):
+        return self.policy(state)
+
+    def __str__(self) -> str:
+        return str(self.name)

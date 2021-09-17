@@ -1,8 +1,8 @@
 (Markov Game MDP)
 	block game
 (Agents)
-	Q-learning,0
-	q2,1
+	RandomPolicy,0
+	RandomAction,1
 (Params)
 	instances : 5
 	episodes : 500
