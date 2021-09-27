@@ -61,8 +61,9 @@ Class that represents a dynamic policy agent in the block game
 
 Parameters:
 policy (function): Function used for picking an action given a state.  The function should take
-    in a BlockGameState and should return a str representing the action to pick (should be a 
-    valid action in the ACTIONS list found in block_game.py) 
+    in a BlockGameState, reward (float), and episode/game number (int) and should return a str 
+    representing the action to pick (should be a valid action in the ACTIONS list found in 
+    block_game.py) 
 name (str): The name of the agent/what policy it's using
 
 """
@@ -73,9 +74,22 @@ class DynamicPolicyBlockGameAgent(Agent):
         Agent.__init__(self, name=name, actions=[])
         self.policy = policy
         self.name = name
+        self.episode_to_update = self.episode_number
 
     def act(self, state: BlockGameState, reward):
-        return self.policy(state)
+        if reward == '':
+            reward = 0
+
+        action = self.policy(state, float(reward), self.episode_number)
+
+        if state.is_terminal():
+            if self.episode_number != self.episode_to_update:
+                self.episode_to_update = self.episode_number
+
+            else:
+                self.episode_number += 1
+
+        return action
 
     def __str__(self) -> str:
         return str(self.name)
