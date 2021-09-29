@@ -34,15 +34,19 @@ class PlayerPoolWithClones(object):
 		for a in agents:
 			clone_structure = CloneStructure(n_states,hidden_layer_size,dropout_rate,n_actions)
 			optimizer = torch.optim.SGD(clone_structure.parameters(), lr=0.001, momentum=0.9)
-			self.clones[a] = (clone_structure, optimizer)
+			self.clones[a.name] = (clone_structure, optimizer)
 
 	def get_probs(self, state):
 		probs = {}
+		input_encoding = self.state_to_input(state)
 
 		for a in self.agents:
-			probs[a.name] = (nn.functional.softmax(self.clones[a][0](state))).numpy()
+			probs[a.name] = (nn.functional.softmax(self.clones[a][0](input_encoding))).numpy()
 
 		return probs
+
+	def state_to_input(self, state):
+		pass
 
 	def train_clones(self):
 		if os.state(self.model_parameter_file).st_size > 0:
@@ -86,3 +90,57 @@ class PlayerPoolWithClones(object):
 
 		print("training done")
 
+
+
+class Chief_Agent_BlockGame(Agent):
+	def __init__(self, name, actions, playerpoolwc):
+		super().__init__(name, actions)
+		self.agent_mapping = dict()
+		self.playerpoolwc = playerpoolwc
+		counter = 0
+
+		for a in playerpoolwc.clones:
+			self.agent_mapping[a] = counter
+			counter += 1
+
+		self.num_agents = counter
+		self.bayesian_inference_distribution = np.ones(counter)/counter
+
+		self.epsilon = 0.3
+
+	def act(self, state, reward):
+		explore = np.random.random() <= self.epsilon
+
+		if explore:
+			return np.random.choice(actions)
+		else:
+			return self._maximize(state, self.get_predicted_action(state))
+
+	def _maximize(self, state, action):
+		pass
+
+	def reset(self):
+		pass
+
+	def get_predicted_action(self, state):
+		preds = np.zeros(len(self.actions))
+		probs = self.playerpoolwc.get_probs(state)
+
+		for a in selfplayerpoolwc.clones:
+			preds += self.bayesian_inference_distribution[self.agent_mapping[a]]*probs[a]
+
+		return np.argmax(preds)
+
+	def make_prob(self, probs):
+		distr = probs/np.sum(probs)
+		distr[-1] = 1 - distr[:-1]
+		return distr
+
+	def bayes_update(self, state, action):
+		action_probs = self.playerpoolwc.get_probs(state)
+		agent_probs = np.zeros(self.num_agents)
+
+		for a in self.playerpoolwc.clones:
+			agent_probs[self.agent_mapping[a]] = action_probs[a][action]
+
+		self.bayesian_inference_distribution = self.make_prob(agent_probs*self.bayesian_inference_distribution)
