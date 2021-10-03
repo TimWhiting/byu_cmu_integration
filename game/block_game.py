@@ -26,6 +26,7 @@ class BlockGameState(State):
     def __init__(self):
         self.blocks = [3 for _ in range(0, 9)]
         self.turn = P1
+        self.selection = [-1, -1]
 
     def get_play_num(self):
         num_p1_actions = self.blocks.count(P1)
@@ -78,6 +79,8 @@ class BlockGameState(State):
         act0 = ACTIONS.index(action_0)
         act1 = ACTIONS.index(action_1)
         state = BlockGameState()
+        state.selection[0] = act0
+        state.selection[1] = act1
         if self.turn == P1:
             if self.blocks[act0] == self.CENTER:
                 state.blocks = copy(self.blocks)
