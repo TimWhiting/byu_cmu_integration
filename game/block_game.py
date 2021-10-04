@@ -21,10 +21,10 @@ ACTIONS = ["red square", "blue square", "purple square", "red triangle",
 class BlockGameState(State):
     ''' Abstract State class '''
 
-    CENTER = 3
+    AVAILABLE = 3
 
     def __init__(self):
-        self.blocks = [3 for _ in range(0, 9)]
+        self.blocks = [BlockGameState.AVAILABLE for _ in range(0, 9)]
         self.turn = P1
 
     def get_play_num(self):
@@ -44,6 +44,11 @@ class BlockGameState(State):
         '''
         return np.array([self.blocks, self.turn]).flatten()
 
+    def valid_moves(self):
+        if self.is_terminal():
+            return []
+        return [ACTIONS[idx] for (idx, availablility) in enumerate(self.blocks) if availablility == self.AVAILABLE]
+
     def get_data(self):
         return [self.blocks, self.turn]
 
@@ -51,7 +56,7 @@ class BlockGameState(State):
         return len(self.blocks()) + 1
 
     def is_terminal(self):
-        return self.blocks.count(self.CENTER) == 3
+        return self.blocks.count(self.AVAILABLE) == 3
 
     def __hash__(self):
         # print(str([self.blocks, self.turn]))
@@ -75,11 +80,11 @@ class BlockGameState(State):
         return len(self.data) + 1
 
     def next(self, action_0, action_1):
-        act0 = ACTIONS.index(action_0)
-        act1 = ACTIONS.index(action_1)
+        act0 = ACTIONS.index(action_0) if action_0 is not None else None
+        act1 = ACTIONS.index(action_1) if action_1 is not None else None
         state = BlockGameState()
         if self.turn == P1:
-            if self.blocks[act0] == self.CENTER:
+            if self.blocks[act0] == self.AVAILABLE:
                 state.blocks = copy(self.blocks)
                 state.blocks[act0] = P1
                 state.turn = P2
@@ -87,7 +92,7 @@ class BlockGameState(State):
             else:
                 pass
         if self.turn == P2:
-            if self.blocks[act1] == self.CENTER:
+            if self.blocks[act1] == self.AVAILABLE:
                 state.blocks = copy(self.blocks)
                 state.blocks[act1] = P2
                 state.turn = P1
@@ -206,4 +211,10 @@ def main(open_plot=True):
 
 
 if __name__ == "__main__":
-    main(open_plot=not sys.argv[-1] == "no_plot")
+    # main(open_plot=not sys.argv[-1] == "no_plot")
+    val = BlockGameState()
+    print(val.valid_moves())
+    val = val.next(ACTIONS[0], None)
+    print(val.valid_moves())
+    val = val.next(None, ACTIONS[4])
+    print(val.valid_moves())
