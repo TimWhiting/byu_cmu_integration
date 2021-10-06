@@ -2,6 +2,7 @@ import copy
 import numpy as np
 import os
 import json
+from collections import defaultdict
 
 from simple_rl.agents import Agent, QLearningAgent, RandomAgent
 import torch
@@ -12,17 +13,19 @@ class CloneStructure(nn.Module):
 	def __init__(self, input_size, hidden_layer_size, dropout_rate, n_actions):
 		super(CloneStructure, self).__init__()
 		self.network = nn.Sequential(
-			nn.Linear(input_size, hl_size),
+			nn.Linear(input_size, hidden_layer_size),
 			nn.ReLU(),
 			nn.Dropout(p=0.3),
-			nn.Linear(hl_size, hl_size),
+			nn.Linear(hidden_layer_size, hidden_layer_size),
 			nn.ReLU(),
 			nn.Dropout(p=0.3),
-			nn.Linear(hl_size,n_actions)
+			nn.Linear(hidden_layer_size,n_actions),
+			nn.LogSoftmax(dim=1)
 			)
 
 	def forward(self, x):
-		return self.network(x)
+		x = self.network(x)
+		return x
 
 
 class PlayerPoolWithClones(object):
@@ -33,6 +36,8 @@ class PlayerPoolWithClones(object):
 		self.n_actions = n_actions # Will be 9 for Block game
 		self.action_encoding = dict()
 		self.markov_game_mdp = markov_game_mdp
+		self.train_data_file = train_data_file
+		self.model_parameter_file = model_parameter_file
 
 		for a in agents:
 			clone_structure = CloneStructure(n_states,hidden_layer_size,dropout_rate,n_actions)
@@ -52,7 +57,8 @@ class PlayerPoolWithClones(object):
 		return probs
 
 	def state_to_input(self, state):
-		return state.features()
+		f = state.features()
+		return f[0] + [f[1]]
 
 	def action_to_output(self, action):
 		return self.action_encoding[action]
@@ -68,9 +74,15 @@ class PlayerPoolWithClones(object):
 
 	def train_clones(self):
 		with open(self.train_data_file, "r") as f:
-			d = json.load(f)
+			try:
+				d = json.load(f)
+			except Exception:
+				d = {}
 
-		model_params = torch.load(self.model_parameter_file)
+		try:
+			model_params = torch.load(self.model_parameter_file)
+		except Exception:
+			model_params = {}
 
 		for agent_blueprint in self.agents:
 			if agent_blueprint.name in model_params:
@@ -95,7 +107,7 @@ class PlayerPoolWithClones(object):
 				for a in [agent1,agent2]:
 					agent_dict[a.name] = a
 
-				for episode in range(1, 101):
+				for episode in range(1, 201):
 
 					reward_dict = defaultdict(str)
 					action_dict = {}
@@ -135,20 +147,27 @@ class PlayerPoolWithClones(object):
 				######################
 				train_x, train_y = d["train X", "train Y"]
 
-			agent_clone, agent_optim = self.clones[a.name]
+			agent_clone, agent_optim = self.clones[agent_blueprint.name]
 			data_set = TensorDataset(torch.Tensor(train_x),torch.Tensor(train_y))
 			data_loader = DataLoader(data_set, batch_size=20, shuffle=True)
+			loss_fn = nn.NLLLoss()
 
-			for e in range(10):
+
+			for e in range(20):
+				avg_loss = 0
+
 				for batch, (X,y) in enumerate(data_loader):
-					pred = model(X)
-					loss = nn.functional.cross_entropy(pred,y)
+					pred = agent_clone(X)
+					loss = loss_fn(pred, torch.tensor(y).to(torch.long))
+					avg_loss += loss
 
 					agent_optim.zero_grad()
 					loss.backward()
 					agent_optim.step()
 
-			self.clones[a.name] = (agent_clone, agent_optim)
+				print(agent_blueprint.name, " - ", e, ":", avg_loss/batch)
+
+			self.clones[agent_blueprint.name] = (agent_clone, agent_optim)
 
 		with open(self.train_data_file, "w") as f:
 			json.dump(d,f)
@@ -188,6 +207,8 @@ class Chief_Agent_BlockGame(Agent):
 		for a in self.actions:
 			new_state = game.transition_func(state,a)
 			# need to see how to maximize in block game
+
+		return self.actions[0]
 
 
 	def reset(self):
