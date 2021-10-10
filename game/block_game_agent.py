@@ -25,8 +25,13 @@ class FixedPolicyBlockGameAgent(Agent):
         Agent.__init__(self, name=name, actions=[])
         self.eval_func = eval_func
         self.name = name
-        self.policy: dict[str, 'str'] = {}
+        self.state_to_action_map: dict[str, 'str'] = {}
         self._train(block_game_tree)
+
+        def policy(state: BlockGameState, reward, episode_number) -> 'str':
+            return self.state_to_action_map[str(state)]
+
+        self.policy = policy
 
     def _train(self, block_game_tree: BlockGameTree):
         state_map = OrderedDict(
@@ -38,7 +43,7 @@ class FixedPolicyBlockGameAgent(Agent):
                 p2_reward = tree_node.state.reward(P2)
 
                 ideal_reward_map[tree_node] = (p1_reward, p2_reward)
-                self.policy[str(tree_node.state)] = ACTIONS[-1]
+                self.state_to_action_map[str(tree_node.state)] = ACTIONS[-1]
 
             else:
                 reward_action_pairs = [(ideal_reward_map[tree_node.action_to_children_map[i]], i)
@@ -47,10 +52,11 @@ class FixedPolicyBlockGameAgent(Agent):
                     reward_action_pairs, tree_node.state.turn)
 
                 ideal_reward_map[tree_node] = ideal_reward
-                self.policy[str(tree_node.state)] = ACTIONS[ideal_action]
+                self.state_to_action_map[str(
+                    tree_node.state)] = ACTIONS[ideal_action]
 
-    def act(self, state: BlockGameState, reward):
-        return self.policy[str(state)]
+    def act(self, state: BlockGameState, reward, episode_number):
+        return self.policy(state, reward, episode_number)
 
     def __str__(self) -> str:
         return str(self.name)
@@ -70,13 +76,15 @@ name (str): The name of the agent/what policy it's using
 
 
 class DynamicPolicyBlockGameAgent(Agent):
-    def __init__(self, policy: 'function', name: str) -> None:
+    def __init__(self, policy: 'function', name: str, changes_during_round: bool, changes_across_rounds: bool) -> None:
         Agent.__init__(self, name=name, actions=[])
         self.policy = policy
         self.name = name
         self.episode_to_update = self.episode_number
+        self.changes_during_round = changes_during_round
+        self.changes_across_rounds = changes_across_rounds
 
-    def act(self, state: BlockGameState, reward):
+    def act(self, state: BlockGameState, reward, episode_number):
         if reward == '':
             reward = 0
 
