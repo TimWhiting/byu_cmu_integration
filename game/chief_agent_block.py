@@ -67,12 +67,15 @@ class PlayerPoolWithClones(object):
 		all_params_dict = dict()
 
 		for c in self.clones:
-			all_params_dict[c] = self.clones[c][0]
-			all_params_dict[c + "_optim"] = self.clones[c][1]
+			all_params_dict[c] = self.clones[c][0].state_dict()
+			all_params_dict[c + "_optim"] = self.clones[c][1].state_dict()
 
 		torch.save(all_params_dict, self.model_parameter_file)
 
 	def train_clones(self):
+		#############################
+		# Loading any existing data #
+		#############################
 		with open(self.train_data_file, "r") as f:
 			try:
 				d = json.load(f)
@@ -84,96 +87,135 @@ class PlayerPoolWithClones(object):
 		except Exception:
 			model_params = {}
 
+		######################################
+		# Getting training data and training #
+		######################################
 		for agent_blueprint in self.agents:
 			if agent_blueprint.name in model_params:
 				print(agent_blueprint.name, " already has trained parameters. Loading now...")
-				self.clones[agent_blueprint.name][0].load_state_dict[model_params[agent_blueprint.name]]
-				self.clones[agent_blueprint.name][1].load_state_dict[model_params[agent_blueprint.name + "_optim"]]
+				self.clones[agent_blueprint.name][0].load_state_dict(model_params[agent_blueprint.name])
+				self.clones[agent_blueprint.name][1].load_state_dict(model_params[agent_blueprint.name + "_optim"])
 				continue
 
 			train_x = []
 			train_y = []
 
-			if not (agent_blueprint.name in d):
-				##########################
-				# Generate training data #
-				##########################
-				agent1 = copy.deepcopy(agent_blueprint)
-				agent2 = copy.deepcopy(agent_blueprint)
-				agent1.name = "a1"
-				agent2.name = "a2"
-
-				agent_dict = {}
-				for a in [agent1,agent2]:
-					agent_dict[a.name] = a
-
-				for episode in range(1, 201):
-
-					reward_dict = defaultdict(str)
-					action_dict = {}
-
-					# Compute initial state/reward.
-					state = self.markov_game_mdp.get_init_state()
-
-					for step in range(30):
-
-						# Compute each agent's policy.
-						for a in agent_dict.values():
-							agent_reward = reward_dict[a.name]
-							agent_action = a.act(state, agent_reward)
-							action_dict[a.name] = agent_action
-
-						# Terminal check.
-						if state.is_terminal():
-							break
-
-						train_x.append(self.state_to_input(state))
-						train_y.append(self.action_to_output(action_dict[list(action_dict.keys())[state.turn]]))
-
-						# Execute in MDP.
-						reward_dict, next_state = self.markov_game_mdp.execute_agent_action(action_dict)
-
-						# Update pointer.
-						state = next_state
-
-					# Reset the MDP, tell the agent the episode is over.
-					self.markov_game_mdp.reset()
+			if not (agent_blueprint.name in d): # If no training data exists for this agent
+				for teammate_blueprint in self.agents:
+					x_addition, y_addition = self._gen_data(agent_blueprint, teammate_blueprint)
+					train_x += x_addition
+					train_y += y_addition
 
 				d[agent_blueprint.name] = (train_x, train_y)
-
 			else:
-				######################
-				# Load training data #
-				######################
 				train_x, train_y = d["train X", "train Y"]
 
-			agent_clone, agent_optim = self.clones[agent_blueprint.name]
-			data_set = TensorDataset(torch.Tensor(train_x),torch.Tensor(train_y))
-			data_loader = DataLoader(data_set, batch_size=20, shuffle=True)
-			loss_fn = nn.NLLLoss()
+			self._train_loop_clone(agent_blueprint.name, train_x, train_y)
 
-
-			for e in range(20):
-				avg_loss = 0
-
-				for batch, (X,y) in enumerate(data_loader):
-					pred = agent_clone(X)
-					loss = loss_fn(pred, torch.tensor(y).to(torch.long))
-					avg_loss += loss
-
-					agent_optim.zero_grad()
-					loss.backward()
-					agent_optim.step()
-
-				print(agent_blueprint.name, " - ", e, ":", avg_loss/batch)
-
-			self.clones[agent_blueprint.name] = (agent_clone, agent_optim)
-
+		##################################
+		# Update files with any new data #
+		##################################
 		with open(self.train_data_file, "w") as f:
 			json.dump(d,f)
 
 		self.resave_model_params()
 		print("training done")
+
+	def _gen_data(self, agent_blueprint, teammate_blueprint, episodes=200):
+		data_x, data_y = [], []
+
+		if np.random.random() < 0.5:
+			agent1 = copy.deepcopy(agent_blueprint)
+			agent2 = copy.deepcopy(teammate_blueprint)
+			agent_ind = 0
+		else:
+			agent1 = copy.deepcopy(teammate_blueprint)
+			agent2 = copy.deepcopy(agent_blueprint)
+			agent_ind = 1
+
+		agent1.name = "a1"
+		agent2.name = "a2"
+		agent_dict = {}
+
+		for a in [agent1,agent2]:
+			agent_dict[a.name] = a
+
+		for episode in range(episodes):
+			reward_dict = defaultdict(str)
+			action_dict = {}
+
+			# Compute initial state/reward.
+			state = self.markov_game_mdp.get_init_state()
+
+			for step in range(30):
+
+				# Compute each agent's policy.
+				for a in agent_dict.values():
+					agent_reward = reward_dict[a.name]
+					agent_action = a.act(state, agent_reward)
+					action_dict[a.name] = agent_action
+
+				# Terminal check.
+				if state.is_terminal():
+					break
+
+				if (state.turn == agent_ind):
+					data_x.append(self.state_to_input(state))
+					data_y.append(self.action_to_output(action_dict[list(action_dict.keys())[state.turn]]))
+
+				# Execute in MDP.
+				reward_dict, next_state = self.markov_game_mdp.execute_agent_action(action_dict)
+
+				# Update pointer.
+				state = next_state
+
+			# Reset the MDP, tell the agent the episode is over.
+			self.markov_game_mdp.reset()
+
+		return (data_x, data_y)
+
+	def _train_loop_clone(self, agent_name, train_x, train_y, update_models=True, epochs=10):
+		agent_clone, agent_optim = self.clones[agent_name]
+		
+		data_set = TensorDataset(torch.Tensor(train_x),torch.Tensor(train_y))
+		data_loader = DataLoader(data_set, batch_size=20, shuffle=True)
+		loss_fn = nn.NLLLoss()
+
+		for e in range(epochs):
+			avg_loss = 0
+
+			for batch, (X,y) in enumerate(data_loader):
+				pred = agent_clone(X)
+				loss = loss_fn(pred, y.to(torch.long))
+				avg_loss += loss
+
+				if update_models:
+					agent_optim.zero_grad()
+					loss.backward()
+					agent_optim.step()
+
+			if update_models:
+				print(agent_name, " - ", e, ":", avg_loss/batch)
+			else:
+				print(agent_name, ":", avg_loss/batch)
+				print(torch.argmax(pred,axis=1),y)
+				break
+
+		if update_models:
+			self.clones[agent_name] = (agent_clone, agent_optim)
+
+	def validate_clones(self):
+		for agent_blueprint in self.agents:
+			test_x, test_y = [], []
+
+			for teammate_blueprint in self.agents:
+				test_x_addition, test_y_addition = self._gen_data(agent_blueprint, teammate_blueprint, episodes=500)
+				test_x += test_x_addition
+				test_y += test_y_addition
+
+			self._train_loop_clone(agent_blueprint.name, test_x, test_y, update_models=False)
+
+
 
 
 
@@ -204,9 +246,13 @@ class Chief_Agent_BlockGame(Agent):
 	def _maximize(self, state): # Going to try to maximize our immediate reward - opponents predicted next reward
 		game = self.playerpoolwc.markov_game_mdp
 
-		for a in self.actions:
-			new_state = game.transition_func(state,a)
-			# need to see how to maximize in block game
+		T = game.get_transition_func()
+		R = game.get_reward_func()
+		D = dict()
+
+		for a in self.
+		for sample in range(50):
+
 
 		return self.actions[0]
 

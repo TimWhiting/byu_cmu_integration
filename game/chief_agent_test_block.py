@@ -162,3 +162,4 @@ cooperative_or_greedy_agent = DynamicPolicyBlockGameAgent(
 agents_list = [minimax_agent, max_self_agent, max_other_agent, max_welfare_agent, random_action_agent, random_policy_agent, play_num_based_agent, efficient_cooperation_agent, cooperative_or_greedy_agent]
 player_pool = PlayerPoolWithClones(agents_list, 10, 30, 0.3, 9, "block_chief_testing_savedparams/traindata", "block_chief_testing_savedparams/params", BlockGameMDP())
 player_pool.train_clones()
+player_pool.validate_clones()
