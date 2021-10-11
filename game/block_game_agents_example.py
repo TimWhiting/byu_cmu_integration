@@ -68,21 +68,22 @@ def random_action(state: BlockGameState, reward: float, episode_number: int) -> 
 
 
 random_action_agent = DynamicPolicyBlockGameAgent(
-    random_action, 'RandomAction')
+    random_action, 'RandomAction', True, False)
 
 
 # Random policy agent (randomly picks an action from the static agents)
 def random_policy(state: BlockGameState, reward: float, episode_number: int) -> str:
     possible_agents = [minimax_agent, max_self_agent,
                        max_welfare_agent, max_other_agent]
-    potential_actions = [agent.act(state, reward) for agent in possible_agents]
+    potential_actions = [agent.act(state, reward, episode_number)
+                         for agent in possible_agents]
     action_index = np.random.choice(potential_actions)
 
     return ACTIONS[action_index]
 
 
 random_policy_agent = DynamicPolicyBlockGameAgent(
-    random_action, 'RandomPolicy')
+    random_action, 'RandomPolicy', True, False)
 
 
 # Play num agent (changes strategy based on the play number)
@@ -90,33 +91,33 @@ def play_num_based_policy(state: BlockGameState, reward: float, episode_number: 
     curr_play_num = state.get_play_num()
 
     if curr_play_num <= 2:
-        return max_self_agent.act(state, reward)
+        return max_self_agent.act(state, reward, episode_number)
 
     elif curr_play_num >= 3 and curr_play_num < 6:
-        return max_welfare_agent.act(state, reward)
+        return max_welfare_agent.act(state, reward, episode_number)
 
     else:
         return ACTIONS[-1]
 
 
 play_num_based_agent = DynamicPolicyBlockGameAgent(
-    play_num_based_policy, 'PlayNumBased')
+    play_num_based_policy, 'PlayNumBased', True, False)
 
 
 # Game num agent (changes strategy based on the episode/game number)
 def game_num_based_policy(state: BlockGameState, reward: float, episode_number: int) -> str:
     if episode_number < 15:
-        return random_policy_agent.act(state, reward)
+        return random_policy_agent.act(state, reward, episode_number)
 
     elif episode_number >= 15 and episode_number < 30:
-        return max_self_agent.act(state, reward)
+        return max_self_agent.act(state, reward, episode_number)
 
     else:
-        return max_self_agent.act(state, reward)
+        return max_self_agent.act(state, reward, episode_number)
 
 
-play_num_based_agent = DynamicPolicyBlockGameAgent(
-    play_num_based_policy, 'PlayNumBased')
+game_num_based_agent = DynamicPolicyBlockGameAgent(
+    game_num_based_policy, 'GameNumBased', True, True)
 
 
 # Efficient cooperation agent (every other game it alternates between picking squares and triangles)
@@ -138,11 +139,11 @@ def efficient_cooperation_policy(state: BlockGameState, reward: float, episode_n
         return ACTIONS[triangle_action_indices[0]]
 
     else:
-        return random_action_agent.act(state, reward)
+        return random_action_agent.act(state, reward, episode_number)
 
 
 efficient_cooperation_agent = DynamicPolicyBlockGameAgent(
-    efficient_cooperation_policy, 'EfficientCoop')
+    efficient_cooperation_policy, 'EfficientCoop', False, True)
 
 
 # Cooperative or greedy agent (tries to achieve efficient cooperation, but will occasionally
@@ -150,23 +151,23 @@ efficient_cooperation_agent = DynamicPolicyBlockGameAgent(
 def cooperative_or_greedy_policy(state: BlockGameState, reward: float, episode_number: int) -> str:
     defect_proba = 0.01
     possible_actions = [max_self_agent.act(
-        state, reward), efficient_cooperation_agent.act(state, reward)]
+        state, reward, episode_number), efficient_cooperation_agent.act(state, reward, episode_number)]
     return np.random.choice(possible_actions, p=[defect_proba, 1 - defect_proba])
 
 
 cooperative_or_greedy_agent = DynamicPolicyBlockGameAgent(
-    cooperative_or_greedy_policy, 'CoopOrGreedy')
+    cooperative_or_greedy_policy, 'CoopOrGreedy', True, True)
 
 
 # Q-learning agent (tries to learn ideal actions over time)
-ql_agent = QLearningAgent(actions=ACTIONS, name="q1")
+ql_agent = QLearningAgent(actions=ACTIONS, name="QL")
 # -------------------------------------------------------------------
 # -------------------------------------------------------------------
 # -------------------------------------------------------------------
 
 
-markov_game = BlockGameMDP()
+# block_game = BlockGameMDP()
 
-# Run experiment
-play_markov_game([efficient_cooperation_agent, cooperative_or_greedy_agent], markov_game,
-                 instances=5, episodes=500, steps=30, open_plot=True)
+# # Run experiment
+# play_markov_game([max_other_agent, max_self_agent], block_game,
+#                  instances=5, episodes=500, steps=30, open_plot=True)

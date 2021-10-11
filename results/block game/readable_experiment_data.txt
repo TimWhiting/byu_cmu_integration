@@ -1,8 +1,8 @@
 (Markov Game MDP)
 	block game
 (Agents)
-	EfficientCoop,0
-	CoopOrGreedy,1
+	MaxOther,0
+	MaxSelf,1
 (Params)
 	instances : 5
 	episodes : 500

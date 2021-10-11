@@ -118,12 +118,7 @@ class ChiefAgent(Agent):
 		return mirrored_action
 
 	def get_predicted_action(self, state):
-		proposed_model_idx = np.argmax(self.current_bayesian_values)
-
-		if (self.current_MLE_values[proposed_model_idx] < self.likelihood_threshold*np.max(self.current_MLE_values)):
-			proposed_model_idx = np.argmax(self.current_MLE_values)
-
-		return self.player_pool.get_agent_action(proposed_model_idx, state)
+		np.transpose(self.current_bayesian_values) * []
 
 	def reset(self):
 		# don't need to reset playerpool, since we never update the agents inside it
