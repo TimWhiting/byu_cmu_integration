@@ -1,8 +1,15 @@
+from scipy.sparse import base
 from block_game import ACTIONS, BlockGameState, P1, P2
 from block_game_tree import BlockGameTree, BlockGameTreeNode
 from collections import OrderedDict
 from simple_rl.agents.AgentClass import Agent
 from typing import Dict, Tuple
+
+
+class BlockGameAgent(Agent):
+    def __init__(self, name: str, baseline_payoff: float) -> None:
+        Agent.__init__(self, name=name, actions=[])
+        self.baseline_payoff = baseline_payoff
 
 
 """
@@ -20,9 +27,10 @@ block_game_tree (BlockGameTree): Tree representing all of the possible game stat
 """
 
 
-class FixedPolicyBlockGameAgent(Agent):
-    def __init__(self, eval_func: 'function', name: str, block_game_tree: BlockGameTree) -> None:
-        Agent.__init__(self, name=name, actions=[])
+class FixedPolicyBlockGameAgent(BlockGameAgent):
+    def __init__(self, eval_func: 'function', name: str, block_game_tree: BlockGameTree, baseline_payoff: float) -> None:
+        BlockGameAgent.__init__(
+            self, name=name, baseline_payoff=baseline_payoff)
         self.eval_func = eval_func
         self.name = name
         self.state_to_action_map: dict[str, 'str'] = {}
@@ -75,9 +83,10 @@ name (str): The name of the agent/what policy it's using
 """
 
 
-class DynamicPolicyBlockGameAgent(Agent):
-    def __init__(self, policy: 'function', name: str, changes_during_round: bool, changes_across_rounds: bool) -> None:
-        Agent.__init__(self, name=name, actions=[])
+class DynamicPolicyBlockGameAgent(BlockGameAgent):
+    def __init__(self, policy: 'function', name: str, changes_during_round: bool, changes_across_rounds: bool, baseline_payoff: float) -> None:
+        BlockGameAgent.__init__(
+            self, name=name, baseline_payoff=baseline_payoff)
         self.policy = policy
         self.name = name
         self.episode_to_update = self.episode_number

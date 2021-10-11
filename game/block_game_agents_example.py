@@ -5,6 +5,7 @@ import numpy as np
 from simple_rl.agents import QLearningAgent
 from simple_rl.run_experiments import play_markov_game
 from typing import List, Tuple
+from copy import deepcopy
 
 block_game_tree = BlockGameTree()
 
@@ -20,7 +21,7 @@ def minimax_func(reward_action_pairs: List[Tuple[Tuple[float, float], int]], tur
 
 
 minimax_agent = FixedPolicyBlockGameAgent(
-    minimax_func, 'Minimax', block_game_tree)
+    minimax_func, 'Minimax', block_game_tree, -30)
 
 
 # Max self agent (tries to maximize their own payoff)
@@ -29,16 +30,16 @@ def max_self_func(reward_action_pairs: List[Tuple[Tuple[float, float], int]], tu
 
 
 max_self_agent = FixedPolicyBlockGameAgent(
-    max_self_func, 'MaxSelf', block_game_tree)
+    max_self_func, 'MaxSelf', block_game_tree, 90)
 
 
-# Max welfare agent (tries to maximize the totaly payoff of both players)
+# Max welfare agent (tries to maximize the total payoff of both players)
 def max_welfare_func(reward_action_pairs: List[Tuple[Tuple[float, float], int]], turn: int) -> Tuple[Tuple[float, float], int]:
     return max(reward_action_pairs, key=lambda x: sum(x[0]))
 
 
 max_welfare_agent = FixedPolicyBlockGameAgent(
-    max_welfare_func, 'MaxWelfare', block_game_tree)
+    max_welfare_func, 'MaxWelfare', block_game_tree, 125)
 
 
 # Max other agent (tries to maximize the payoff of the other player)
@@ -48,7 +49,16 @@ def max_other_func(reward_action_pairs: List[Tuple[Tuple[float, float], int]], t
 
 
 max_other_agent = FixedPolicyBlockGameAgent(
-    max_other_func, 'MaxOther', block_game_tree)
+    max_other_func, 'MaxOther', block_game_tree, 125)
+
+
+# Min welfare agent (tries to minimize the total payoff of both players)
+def min_welfare_func(reward_action_pairs: List[Tuple[Tuple[float, float], int]], turn: int) -> Tuple[Tuple[float, float], int]:
+    return min(reward_action_pairs, key=lambda x: sum(x[0]))
+
+
+min_welfare_agent = FixedPolicyBlockGameAgent(
+    min_welfare_func, 'MinWelfare', block_game_tree, -31.875)
 # -------------------------------------------------------------------
 # -------------------------------------------------------------------
 # -------------------------------------------------------------------
@@ -68,7 +78,7 @@ def random_action(state: BlockGameState, reward: float, episode_number: int) -> 
 
 
 random_action_agent = DynamicPolicyBlockGameAgent(
-    random_action, 'RandomAction', True, False)
+    random_action, 'RandomAction', True, False, -8.65)
 
 
 # Random policy agent (randomly picks an action from the static agents)
@@ -83,7 +93,7 @@ def random_policy(state: BlockGameState, reward: float, episode_number: int) -> 
 
 
 random_policy_agent = DynamicPolicyBlockGameAgent(
-    random_action, 'RandomPolicy', True, False)
+    random_action, 'RandomPolicy', True, False, -3.5625)
 
 
 # Play num agent (changes strategy based on the play number)
@@ -101,7 +111,7 @@ def play_num_based_policy(state: BlockGameState, reward: float, episode_number: 
 
 
 play_num_based_agent = DynamicPolicyBlockGameAgent(
-    play_num_based_policy, 'PlayNumBased', True, False)
+    play_num_based_policy, 'PlayNumBased', True, False, 90.0)
 
 
 # Game num agent (changes strategy based on the episode/game number)
@@ -117,7 +127,7 @@ def game_num_based_policy(state: BlockGameState, reward: float, episode_number: 
 
 
 game_num_based_agent = DynamicPolicyBlockGameAgent(
-    game_num_based_policy, 'GameNumBased', True, True)
+    game_num_based_policy, 'GameNumBased', True, True, -8.0625)
 
 
 # Efficient cooperation agent (every other game it alternates between picking squares and triangles)
@@ -143,7 +153,7 @@ def efficient_cooperation_policy(state: BlockGameState, reward: float, episode_n
 
 
 efficient_cooperation_agent = DynamicPolicyBlockGameAgent(
-    efficient_cooperation_policy, 'EfficientCoop', False, True)
+    efficient_cooperation_policy, 'EfficientCoop', False, True, 125.0)
 
 
 # Cooperative or greedy agent (tries to achieve efficient cooperation, but will occasionally
@@ -156,8 +166,21 @@ def cooperative_or_greedy_policy(state: BlockGameState, reward: float, episode_n
 
 
 cooperative_or_greedy_agent = DynamicPolicyBlockGameAgent(
-    cooperative_or_greedy_policy, 'CoopOrGreedy', True, True)
+    cooperative_or_greedy_policy, 'CoopOrGreedy', True, True, 121.875)
 
+
+# Greedy until negative agent (plays greedily until its reward is negative; after that, it
+# will try to cooperate)
+def greedy_until_negative_policy(state: BlockGameState, reward: float, episode_number: int) -> str:
+    if reward < 0:
+        return efficient_cooperation_agent.act(state, reward, episode_number)
+
+    else:
+        return max_self_agent.act(state, reward, episode_number)
+
+
+greedy_until_negative_agent = DynamicPolicyBlockGameAgent(
+    greedy_until_negative_policy, 'GreedUntilNegative', True, True, 90.0)
 
 # Q-learning agent (tries to learn ideal actions over time)
 ql_agent = QLearningAgent(actions=ACTIONS, name="QL")
@@ -165,9 +188,45 @@ ql_agent = QLearningAgent(actions=ACTIONS, name="QL")
 # -------------------------------------------------------------------
 # -------------------------------------------------------------------
 
+find_baseline_payoffs = False
 
-# block_game = BlockGameMDP()
+if find_baseline_payoffs:
+    n_rounds = 50
+    block_game = BlockGameMDP()
 
-# # Run experiment
-# play_markov_game([max_other_agent, max_self_agent], block_game,
-#                  instances=5, episodes=500, steps=30, open_plot=True)
+    agents = [minimax_agent, max_self_agent, max_welfare_agent, max_other_agent, min_welfare_agent, random_action_agent, random_policy_agent,
+              play_num_based_agent, game_num_based_agent, efficient_cooperation_agent, cooperative_or_greedy_agent, greedy_until_negative_agent, ql_agent]
+
+    for agent in agents:
+        player1 = deepcopy(agent)
+        player2 = deepcopy(agent)
+        player1.name = 'player1'
+        player2.name = 'player2'
+
+        reward_map = {player1.name: 0, player2.name: 0}
+
+        for round_num in range(1, n_rounds + 1):
+            block_game.reset()
+            state = block_game.get_init_state()
+            action_map = dict()
+
+            while not state.is_terminal():
+                for curr_agent in [player1, player2]:
+                    agent_reward = reward_map[curr_agent.name]
+                    agent_action = curr_agent.act(
+                        state, agent_reward, round_num - 1) if not isinstance(curr_agent, QLearningAgent) else curr_agent.act(
+                        state, agent_reward)
+                    action_map[curr_agent.name] = agent_action
+
+                updated_rewards_map, next_state = block_game.execute_agent_action(
+                    action_map)
+
+                for agent_name, new_reward in updated_rewards_map.items():
+                    reward_map[agent_name] += new_reward
+
+                state = next_state
+
+        avg_payoff = ((reward_map[player1.name] / n_rounds) +
+                      (reward_map[player2.name] / n_rounds)) / 2
+
+        print('Baseline for ' + str(agent.name) + ' is: ' + str(avg_payoff))

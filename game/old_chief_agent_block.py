@@ -97,6 +97,14 @@ class ChiefAgent(Agent):
 
         self.moves_recorded += 1
 
+    def get_proposed_model(self):
+        proposed_model_idx = np.argmax(self.current_bayesian_values)
+
+        if (self.current_MLE_values[proposed_model_idx] < self.likelihood_threshold):
+            proposed_model_idx = np.argmax(self.current_MLE_values)
+
+        return self.player_pool.agents[proposed_model_idx]
+
     def act(self, state, reward, episode_number):
         if self.prev_state is not None and self.prev_state.turn == self.partner_idx:
             self.record_teammate_action(

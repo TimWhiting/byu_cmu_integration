@@ -3,6 +3,11 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 import numpy as np
+from chief_block_aat import run_games
+
+run_games(train=True)
+
+print('Training KNN model...')
 
 data_dir = './training_data/'
 
@@ -13,6 +18,11 @@ x = training_data[:, 0:-1]
 y = training_data[:, -1]
 
 x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3)
+
+print('X train shape: ' + str(x_train.shape))
+print('Y train shape: ' + str(y_train.shape))
+print('X test shape: ' + str(x_test.shape))
+print('Y test shape: ' + str(y_test.shape))
 
 scaler = StandardScaler()
 x_train_scaled = scaler.fit_transform(x_train)

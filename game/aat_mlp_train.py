@@ -3,6 +3,9 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 import numpy as np
+from chief_block_aat import run_games
+
+run_games(train=True)
 
 data_dir = './training_data/'
 
