@@ -52,15 +52,13 @@ class PlayerPoolWithClones(object):
 
     def get_probs(self, state):
         probs = {}
-        input_encoding = self.state_to_input(state)
+        input_encoding = torch.Tensor([self.state_to_input(state)])
 
         for a in self.agents:
-            probs[a.name] = (nn.functional.softmax(
-                self.clones[a][0](input_encoding))).numpy()
+            probs[a.name] = np.array((nn.functional.softmax(
+                self.clones[a.name][0](input_encoding), dim=1)).tolist()[0])
 
-    for a in playerpoolwc.clones:
-        self.agent_mapping[a] = counter
-        counter += 1
+        return probs
 
     def state_to_input(self, state):
         f = state.features()
@@ -73,154 +71,160 @@ class PlayerPoolWithClones(object):
         all_params_dict = dict()
 
         for c in self.clones:
-            all_params_dict[c] = self.clones[c][0]
-            all_params_dict[c + "_optim"] = self.clones[c][1]
+            all_params_dict[c] = self.clones[c][0].state_dict()
+            all_params_dict[c + "_optim"] = self.clones[c][1].state_dict()
 
         torch.save(all_params_dict, self.model_parameter_file)
 
-	def train_clones(self):
-		#############################
-		# Loading any existing data #
-		#############################
-		with open(self.train_data_file, "r") as f:
-			try:
-				d = json.load(f)
-			except Exception:
-				d = {}
+    def train_clones(self):
+        #############################
+        # Loading any existing data #
+        #############################
+        with open(self.train_data_file, "r") as f:
+            try:
+                d = json.load(f)
+            except Exception:
+                d = {}
 
-		try:
+        try:
             model_params = torch.load(self.model_parameter_file)
         except Exception:
             model_params = {}
 
-		######################################
-		# Getting training data and training #
-		######################################
-		for agent_blueprint in self.agents:
-			if agent_blueprint.name in model_params:
-				print(agent_blueprint.name, " already has trained parameters. Loading now...")
-				self.clones[agent_blueprint.name][0].load_state_dict(model_params[agent_blueprint.name])
-				self.clones[agent_blueprint.name][1].load_state_dict(model_params[agent_blueprint.name + "_optim"])
-				continue
+        ######################################
+        # Getting training data and training #
+        ######################################
+        for agent_blueprint in self.agents:
+            train_x, train_y = [], []
 
-			if not (agent_blueprint.name in d): # If no training data exists for this agent
-				for teammate_blueprint in self.agents:
-					x_addition, y_addition = self._gen_data(agent_blueprint, teammate_blueprint)
-					train_x += x_addition
-					train_y += y_addition
+            if agent_blueprint.name in model_params:
+                print(agent_blueprint.name, " already has trained parameters. Loading now...")
+                self.clones[agent_blueprint.name][0].load_state_dict(model_params[agent_blueprint.name])
+                self.clones[agent_blueprint.name][1].load_state_dict(model_params[agent_blueprint.name + "_optim"])
+                continue
 
-				d[agent_blueprint.name] = (train_x, train_y)
-			else:
-				train_x, train_y = d["train X", "train Y"]
+            if not (agent_blueprint.name in d): # If no training data exists for this agent
+                for teammate_blueprint in self.agents:
+                    x_addition, y_addition = self._gen_data(agent_blueprint, teammate_blueprint)
+                    train_x += x_addition
+                    train_y += y_addition
 
-			self._train_loop_clone(agent_blueprint.name, train_x, train_y)
+                d[agent_blueprint.name] = (train_x, train_y)
+            else:
+                train_x, train_y = d["train X", "train Y"]
 
-		##################################
-		# Update files with any new data #
-		##################################
-		with open(self.train_data_file, "w") as f:
-			json.dump(d,f)
+            self._train_loop_clone(agent_blueprint.name, train_x, train_y)
 
-		self.resave_model_params()
-		print("training done")
+        ##################################
+        # Update files with any new data #
+        ##################################
+        with open(self.train_data_file, "w") as f:
+            json.dump(d,f)
 
-	def _gen_data(self, agent_blueprint, teammate_blueprint, episodes=200):
-		data_x, data_y = [], []
+        self.resave_model_params()
+        print("training done")
 
-		if np.random.random() < 0.5:
-			agent1 = copy.deepcopy(agent_blueprint)
-			agent2 = copy.deepcopy(teammate_blueprint)
-			agent_ind = 0
-		else:
-			agent1 = copy.deepcopy(teammate_blueprint)
-			agent2 = copy.deepcopy(agent_blueprint)
-			agent_ind = 1
+    def _gen_data(self, agent_blueprint, teammate_blueprint, episodes=200):
+        data_x, data_y = [], []
 
-		agent1.name = "a1"
-		agent2.name = "a2"
-		agent_dict = {}
+        if np.random.random() < 0.5:
+            agent1 = copy.deepcopy(agent_blueprint)
+            agent2 = copy.deepcopy(teammate_blueprint)
+            agent_ind = 0
+        else:
+            agent1 = copy.deepcopy(teammate_blueprint)
+            agent2 = copy.deepcopy(agent_blueprint)
+            agent_ind = 1
 
-		for a in [agent1,agent2]:
-			agent_dict[a.name] = a
+        agent1.name = "a1"
+        agent2.name = "a2"
+        agent_dict = {}
 
-		for episode in range(episodes):
-			reward_dict = defaultdict(str)
-			action_dict = {}
+        for a in [agent1,agent2]:
+            agent_dict[a.name] = a
 
-			# Compute initial state/reward.
-			state = self.markov_game_mdp.get_init_state()
+        for episode in range(episodes):
+            reward_dict = defaultdict(str)
+            action_dict = {}
 
-			for step in range(30):
+            # Compute initial state/reward.
+            state = self.markov_game_mdp.get_init_state()
 
-				# Compute each agent's policy.
-				for a in agent_dict.values():
-					agent_reward = reward_dict[a.name]
-					agent_action = a.act(state, agent_reward)
-					action_dict[a.name] = agent_action
+            for step in range(30):
 
-				# Terminal check.
-				if state.is_terminal():
-					break
+                # Compute each agent's policy.
+                for a in agent_dict.values():
+                    agent_reward = reward_dict[a.name]
+                    agent_action = a.act(state, agent_reward, episode)
+                    action_dict[a.name] = agent_action
 
-				if (state.turn == agent_ind):
-					data_x.append(self.state_to_input(state))
-					data_y.append(self.action_to_output(action_dict[list(action_dict.keys())[state.turn]]))
+                # Terminal check.
+                if state.is_terminal():
+                    break
 
-				# Execute in MDP.
-				reward_dict, next_state = self.markov_game_mdp.execute_agent_action(action_dict)
+                if (state.turn == agent_ind):
+                    data_x.append(self.state_to_input(state))
+                    data_y.append(self.action_to_output(action_dict[list(action_dict.keys())[state.turn]]))
 
-				# Update pointer.
-				state = next_state
+                # Execute in MDP.
+                reward_dict, next_state = self.markov_game_mdp.execute_agent_action(action_dict)
 
-			# Reset the MDP, tell the agent the episode is over.
-			self.markov_game_mdp.reset()
+                # Update pointer.
+                state = next_state
 
-		return (data_x, data_y)
+            # Reset the MDP, tell the agent the episode is over.
+            self.markov_game_mdp.reset()
 
-	def _train_loop_clone(self, agent_name, train_x, train_y, update_models=True, epochs=10):
-		agent_clone, agent_optim = self.clones[agent_name]
-		
-		data_set = TensorDataset(torch.Tensor(train_x),torch.Tensor(train_y))
-		data_loader = DataLoader(data_set, batch_size=20, shuffle=True)
-		loss_fn = nn.NLLLoss()
+        return (data_x, data_y)
 
-		for e in range(epochs):
-			avg_loss = 0
+    def _train_loop_clone(self, agent_name, train_x, train_y, update_models=True, epochs=10):
+        agent_clone, agent_optim = self.clones[agent_name]
+        
+        data_set = TensorDataset(torch.Tensor(train_x),torch.Tensor(train_y))
+        data_loader = DataLoader(data_set, batch_size=20, shuffle=True)
+        loss_fn = nn.NLLLoss()
+        test_acc = []
 
-			for batch, (X,y) in enumerate(data_loader):
-				pred = agent_clone(X)
-				loss = loss_fn(pred, y.to(torch.long))
-				avg_loss += loss
+        for e in range(epochs):
+            avg_loss = 0
 
-				if update_models:
-					agent_optim.zero_grad()
-					loss.backward()
-					agent_optim.step()
+            for batch, (X,y) in enumerate(data_loader):
+                pred = agent_clone(X)
+                loss = loss_fn(pred, y.to(torch.long))
+                avg_loss += loss
 
-			if update_models:
-				print(agent_name, " - ", e, ":", avg_loss/batch)
-			else:
-				print(agent_name, ":", avg_loss/batch)
-				print(torch.argmax(pred,axis=1),y)
-				break
+                if update_models:
+                    agent_optim.zero_grad()
+                    loss.backward()
+                    agent_optim.step()
+                else:
+                    test_acc += list((torch.argmax(pred,axis=1) == y.to(torch.long)).to(torch.float))
 
-		if update_models:
-			self.clones[agent_name] = (agent_clone, agent_optim)
+            if update_models:
+                print(agent_name, " - ", e, ":", avg_loss/batch)
+            else:
+                print(agent_name, ":", avg_loss/batch)
+                print("mean accuracy", np.mean(test_acc))
+                print()
+                break
 
-	def validate_clones(self):
-		for agent_blueprint in self.agents:
-			test_x, test_y = [], []
+        if update_models:
+            self.clones[agent_name] = (agent_clone, agent_optim)
 
-			for teammate_blueprint in self.agents:
-				test_x_addition, test_y_addition = self._gen_data(agent_blueprint, teammate_blueprint, episodes=500)
-				test_x += test_x_addition
-				test_y += test_y_addition
+    def validate_clones(self):
+        for agent_blueprint in self.agents:
+            test_x, test_y = [], []
 
-			self._train_loop_clone(agent_blueprint.name, test_x, test_y, update_models=False)
+            for teammate_blueprint in self.agents:
+                test_x_addition, test_y_addition = self._gen_data(agent_blueprint, teammate_blueprint, episodes=500)
+                test_x += test_x_addition
+                test_y += test_y_addition
+
+            self._train_loop_clone(agent_blueprint.name, test_x, test_y, update_models=False)
 
 
 class Chief_Agent_BlockGame(Agent):
-    def __init__(self, name, actions, playerpoolwc):
+    def __init__(self, name, actions, playerpoolwc, player_ind):
         super().__init__(name, actions)
         self.agent_mapping = dict()
         self.playerpoolwc = playerpoolwc
@@ -232,68 +236,77 @@ class Chief_Agent_BlockGame(Agent):
 
         self.num_agents = counter
         self.bayesian_inference_distribution = np.ones(counter)/counter
-
         self.epsilon = 0.3
+        self.player_ind = player_ind
+        self.prev_state = None
 
-    def act(self, state, reward):
+    def act(self, state, reward, episode_number):
+        if self.prev_state != None and state.turn == 1 - self.player_ind:
+            self.bayes_update(self.prev_state, state.selection[1 - self.player_ind])
+
+        self.prev_state = state
+
         explore = np.random.random() <= self.epsilon
 
         if explore:
-            return np.random.choice(actions)
+            return np.random.choice(self.actions)
         else:
             return self._maximize(state)
 
     # Going to try to maximize our immediate reward - opponents predicted next reward
     def _maximize(self, state):
-		D = dict()
-		player_ind = state.turn
+        D = dict()
+        player_ind = state.turn
 
-		for a in state.valid_moves():
-			r = 0
+        for a in state.valid_moves():
+            r = 0
 
-			for sample in range(50):
-				r += self._simulate_game(state, a, player_ind)
+            for sample in range(50):
+                r += self._simulate_game(state, a, player_ind)
 
-			D[a] = r/50
+            D[a] = r/50
 
         return max(D, key=D.get)
 
     # The CHIEF will always assume that it is the state.turn agent (if not doesn't matter because game won't care about CHIEF's action)
     def _simulate_game(self, state_input, initial_action, chief_ind):
-    	game = self.playerpoolwc.markov_game_mdp
-       	action_tracker = initial_action
-    	chief_reward = 0
+        game = self.playerpoolwc.markov_game_mdp
+        action_tracker = initial_action
+        chief_reward = 0
 
-		chief_name = "c"
-		other_player_name = "p"
+        chief_name = "c"
+        other_player_name = "p"
 
-		reward_dict = defaultdict(str)
-		action_dict = {}
-		state = state_input
+        reward_dict = defaultdict(str)
+        action_dict = {}
+        state = state_input
 
-		for step in range(30):
-			if chief_ind = 0:
-				action_dict[chief_name] = action_tracker
-				action_dict[other_player_name] = self.get_predicted_action(state)
-			else:
-				action_dict[other_player_name] = self.get_predicted_action(state)
-				action_dict[chief_name] = action_tracker
+        for step in range(30):
+            if chief_ind == 0:
+                action_dict[chief_name] = action_tracker
+                action_dict[other_player_name] = self.actions[self.get_predicted_action(state)]
+            else:
+                action_dict[other_player_name] = self.actions[self.get_predicted_action(state)]
+                action_dict[chief_name] = action_tracker
 
-			# Terminal check.
-			if state.is_terminal():
-				break
+            # Terminal check.
+            if state.is_terminal():
+                break
 
-			# Execute in MDP.
-			reward_dict, next_state = self.markov_game_mdp.execute_agent_action(action_dict)
-			chief_reward += reward_dict[chief_name]
+            # Execute in MDP.
+            reward_dict, next_state = self.playerpoolwc.markov_game_mdp.execute_agent_action(action_dict)
+            chief_reward += reward_dict[chief_name]
 
-			# Update pointer.
-			state = next_state
+            # Update pointer.
+            state = next_state
 
-			if state.turn == chief_ind:
-				action_tracker = np.random.choice(state.valid_moves())
+            if state.turn == chief_ind:
+                if state.valid_moves() == []:
+                    break
 
-		return chief_reward
+                action_tracker = np.random.choice(state.valid_moves())
+
+        return chief_reward
 
 
     def reset(self):
@@ -304,14 +317,14 @@ class Chief_Agent_BlockGame(Agent):
         preds = np.zeros(len(self.actions))
         probs = self.playerpoolwc.get_probs(state)
 
-        for a in selfplayerpoolwc.clones:
+        for a in self.playerpoolwc.clones:
             preds += self.bayesian_inference_distribution[self.agent_mapping[a]]*probs[a]
 
         return np.argmax(preds)
 
     def make_prob(self, probs):
         distr = probs/np.sum(probs)
-        distr[-1] = 1 - distr[:-1]
+        distr[-1] = 1 - np.sum(distr[:-1])
         return distr
 
     def bayes_update(self, state, action):
