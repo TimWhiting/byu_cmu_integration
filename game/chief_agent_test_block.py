@@ -6,6 +6,7 @@ import numpy as np
 from simple_rl.agents import QLearningAgent
 from simple_rl.run_experiments import play_markov_game
 from typing import List, Tuple
+from tabulate import tabulate
 
 block_game_tree = BlockGameTree()
 
@@ -69,21 +70,21 @@ def random_action(state: BlockGameState, reward: float, episode_number: int) -> 
 
 
 random_action_agent = DynamicPolicyBlockGameAgent(
-    random_action, 'RandomAction')
+    random_action, 'RandomAction', True, True)
 
 
 # Random policy agent (randomly picks an action from the static agents)
 def random_policy(state: BlockGameState, reward: float, episode_number: int) -> str:
     possible_agents = [minimax_agent, max_self_agent,
                        max_welfare_agent, max_other_agent]
-    potential_actions = [agent.act(state, reward) for agent in possible_agents]
+    potential_actions = [agent.act(state, reward, episode_number) for agent in possible_agents]
     action_index = np.random.choice(potential_actions)
 
     return ACTIONS[action_index]
 
 
 random_policy_agent = DynamicPolicyBlockGameAgent(
-    random_action, 'RandomPolicy')
+    random_action, 'RandomPolicy', True, True)
 
 
 # Play num agent (changes strategy based on the play number)
@@ -91,33 +92,33 @@ def play_num_based_policy(state: BlockGameState, reward: float, episode_number: 
     curr_play_num = state.get_play_num()
 
     if curr_play_num <= 2:
-        return max_self_agent.act(state, reward)
+        return max_self_agent.act(state, reward, episode_number)
 
     elif curr_play_num >= 3 and curr_play_num < 6:
-        return max_welfare_agent.act(state, reward)
+        return max_welfare_agent.act(state, reward, episode_number)
 
     else:
         return ACTIONS[-1]
 
 
 play_num_based_agent = DynamicPolicyBlockGameAgent(
-    play_num_based_policy, 'PlayNumBased')
+    play_num_based_policy, 'PlayNumBased', True, True)
 
 
 # Game num agent (changes strategy based on the episode/game number)
 def game_num_based_policy(state: BlockGameState, reward: float, episode_number: int) -> str:
     if episode_number < 15:
-        return random_policy_agent.act(state, reward)
+        return random_policy_agent.act(state, reward, episode_number)
 
     elif episode_number >= 15 and episode_number < 30:
-        return max_self_agent.act(state, reward)
+        return max_self_agent.act(state, reward, episode_number)
 
     else:
-        return max_self_agent.act(state, reward)
+        return max_self_agent.act(state, reward, episode_number)
 
 
 play_num_based_agent = DynamicPolicyBlockGameAgent(
-    play_num_based_policy, 'PlayNumBased')
+    play_num_based_policy, 'PlayNumBased', True, True)
 
 
 # Efficient cooperation agent (every other game it alternates between picking squares and triangles)
@@ -139,11 +140,11 @@ def efficient_cooperation_policy(state: BlockGameState, reward: float, episode_n
         return ACTIONS[triangle_action_indices[0]]
 
     else:
-        return random_action_agent.act(state, reward)
+        return random_action_agent.act(state, reward, episode_number)
 
 
 efficient_cooperation_agent = DynamicPolicyBlockGameAgent(
-    efficient_cooperation_policy, 'EfficientCoop')
+    efficient_cooperation_policy, 'EfficientCoop', True, True)
 
 
 # Cooperative or greedy agent (tries to achieve efficient cooperation, but will occasionally
@@ -151,15 +152,61 @@ efficient_cooperation_agent = DynamicPolicyBlockGameAgent(
 def cooperative_or_greedy_policy(state: BlockGameState, reward: float, episode_number: int) -> str:
     defect_proba = 0.01
     possible_actions = [max_self_agent.act(
-        state, reward), efficient_cooperation_agent.act(state, reward)]
+        state, reward, episode_number), efficient_cooperation_agent.act(state, reward, episode_number)]
     return np.random.choice(possible_actions, p=[defect_proba, 1 - defect_proba])
 
 
 cooperative_or_greedy_agent = DynamicPolicyBlockGameAgent(
-    cooperative_or_greedy_policy, 'CoopOrGreedy')
+    cooperative_or_greedy_policy, 'CoopOrGreedy', True, True)
 
 
 agents_list = [minimax_agent, max_self_agent, max_other_agent, max_welfare_agent, random_action_agent, random_policy_agent, play_num_based_agent, efficient_cooperation_agent, cooperative_or_greedy_agent]
 player_pool = PlayerPoolWithClones(agents_list, 10, 30, 0.3, 9, "block_chief_testing_savedparams/traindata", "block_chief_testing_savedparams/params", BlockGameMDP())
 player_pool.train_clones()
-player_pool.validate_clones()
+# player_pool.validate_clones()
+
+human_idx = 0
+chief_player = Chief_Agent_BlockGame("chief", ACTIONS, player_pool, 1 - human_idx)
+
+
+
+human_player = DynamicPolicyBlockGameAgent(play_num_based_policy, 'PlayNumBased', True, True)
+
+# execution
+if human_idx == 0:
+    agents = [human_player, chief_player]
+else:
+    agents = [chief_player, human_player]
+
+markov_game = BlockGameMDP()
+markov_game.reset()
+state = markov_game.get_init_state()
+
+res = 0
+step_num = 200
+
+for step in range(step_num):
+    while(not state.is_terminal()):
+        action_dict = dict()
+        reward_dict = defaultdict(str)
+
+        prediction = chief_player.get_predicted_action(state)
+
+        for a in agents:
+            agent_reward = reward_dict[a.name]
+            agent_action = a.act(state, agent_reward, step)
+
+            if a.name != "chief" and np.random.random() < .2: # adding noise
+                agent_action = np.random.choice(state.valid_moves())
+
+            action_dict[a.name] = agent_action
+
+        correct_val = int(prediction == action_dict[human_player.name])
+        reward_dict, next_state = markov_game.execute_agent_action(action_dict)
+        state = next_state
+
+        print("========= AFTER STEP:", step, "==========")
+        table = [["agent options"] + list(player_pool.clones.keys()),
+                 ["bayesian inference"] + list(np.vectorize(lambda A: round(A,3))(chief_player.bayesian_inference_distribution))]
+        print(tabulate(table))
+        print("Prediction:", prediction, "which was", bool(correct_val), "(actual action: " + str(action_dict[human_player.name]) + ")")
