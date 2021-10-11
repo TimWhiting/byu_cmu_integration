@@ -245,18 +245,56 @@ class Chief_Agent_BlockGame(Agent):
 
     # Going to try to maximize our immediate reward - opponents predicted next reward
     def _maximize(self, state):
-        game = self.playerpoolwc.markov_game_mdp
-
-		T = game.get_transition_func()
-		R = game.get_reward_func()
 		D = dict()
+		player_ind = state.turn
 
-		for a in self.actions:
+		for a in state.valid_moves():
+			r = 0
+
 			for sample in range(50):
-				# do stuff
+				r += self._simulate_game(state, a, player_ind)
 
+			D[a] = r/50
 
-        return self.actions[0]
+        return max(D, key=D.get)
+
+    # The CHIEF will always assume that it is the state.turn agent (if not doesn't matter because game won't care about CHIEF's action)
+    def _simulate_game(self, state_input, initial_action, chief_ind):
+    	game = self.playerpoolwc.markov_game_mdp
+       	action_tracker = initial_action
+    	chief_reward = 0
+
+		chief_name = "c"
+		other_player_name = "p"
+
+		reward_dict = defaultdict(str)
+		action_dict = {}
+		state = state_input
+
+		for step in range(30):
+			if chief_ind = 0:
+				action_dict[chief_name] = action_tracker
+				action_dict[other_player_name] = self.get_predicted_action(state)
+			else:
+				action_dict[other_player_name] = self.get_predicted_action(state)
+				action_dict[chief_name] = action_tracker
+
+			# Terminal check.
+			if state.is_terminal():
+				break
+
+			# Execute in MDP.
+			reward_dict, next_state = self.markov_game_mdp.execute_agent_action(action_dict)
+			chief_reward += reward_dict[chief_name]
+
+			# Update pointer.
+			state = next_state
+
+			if state.turn == chief_ind:
+				action_tracker = np.random.choice(state.valid_moves())
+
+		return chief_reward
+
 
     def reset(self):
         # This will never need to reset any parameters, since they can just be used over multiple games
