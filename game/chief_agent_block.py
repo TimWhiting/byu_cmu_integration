@@ -16,10 +16,10 @@ class CloneStructure(nn.Module):
         self.network = nn.Sequential(
             nn.Linear(input_size, hidden_layer_size),
             nn.ReLU(),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=0.2),
             nn.Linear(hidden_layer_size, hidden_layer_size),
             nn.ReLU(),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=0.2),
             nn.Linear(hidden_layer_size, n_actions),
             nn.LogSoftmax(dim=1)
         )
@@ -105,7 +105,7 @@ class PlayerPoolWithClones(object):
 
             if not (agent_blueprint.name in d): # If no training data exists for this agent
                 for teammate_blueprint in self.agents:
-                    x_addition, y_addition = self._gen_data(agent_blueprint, teammate_blueprint)
+                    x_addition, y_addition = self._gen_data(agent_blueprint, teammate_blueprint, episodes=500)
                     train_x += x_addition
                     train_y += y_addition
 
@@ -124,56 +124,57 @@ class PlayerPoolWithClones(object):
         self.resave_model_params()
         print("training done")
 
-    def _gen_data(self, agent_blueprint, teammate_blueprint, episodes=200):
+    def _gen_data(self, agent_blueprint, teammate_blueprint, trials=5, episodes=200):
         data_x, data_y = [], []
 
-        if np.random.random() < 0.5:
-            agent1 = copy.deepcopy(agent_blueprint)
-            agent2 = copy.deepcopy(teammate_blueprint)
-            agent_ind = 0
-        else:
-            agent1 = copy.deepcopy(teammate_blueprint)
-            agent2 = copy.deepcopy(agent_blueprint)
-            agent_ind = 1
+        for i in range(trials):
+            if np.random.random() < 0.5:
+                agent1 = copy.deepcopy(agent_blueprint)
+                agent2 = copy.deepcopy(teammate_blueprint)
+                agent_ind = 0
+            else:
+                agent1 = copy.deepcopy(teammate_blueprint)
+                agent2 = copy.deepcopy(agent_blueprint)
+                agent_ind = 1
 
-        agent1.name = "a1"
-        agent2.name = "a2"
-        agent_dict = {}
+            agent1.name = "a1"
+            agent2.name = "a2"
+            agent_dict = {}
 
-        for a in [agent1,agent2]:
-            agent_dict[a.name] = a
+            for a in [agent1,agent2]:
+                agent_dict[a.name] = a
 
-        for episode in range(episodes):
-            reward_dict = defaultdict(str)
-            action_dict = {}
+            for episode in range(episodes):
+                reward_dict = defaultdict(str)
+                action_dict = {}
 
-            # Compute initial state/reward.
-            state = self.markov_game_mdp.get_init_state()
+                # Compute initial state/reward.
+                state = self.markov_game_mdp.get_init_state()
 
-            for step in range(30):
+                for step in range(30):
 
-                # Compute each agent's policy.
-                for a in agent_dict.values():
-                    agent_reward = reward_dict[a.name]
-                    agent_action = a.act(state, agent_reward, episode)
-                    action_dict[a.name] = agent_action
+                    # Compute each agent's policy.
+                    for a in agent_dict.values():
+                        agent_reward = reward_dict[a.name]
+                        agent_action = a.act(state, agent_reward, episode)
+                        action_dict[a.name] = agent_action
 
-                # Terminal check.
-                if state.is_terminal():
-                    break
+                    # Terminal check.
+                    if state.is_terminal():
+                        break
 
-                if (state.turn == agent_ind):
-                    data_x.append(self.state_to_input(state))
-                    data_y.append(self.action_to_output(action_dict[list(action_dict.keys())[state.turn]]))
+                    if (state.turn == agent_ind):
+                        data_x.append(self.state_to_input(state))
+                        data_y.append(self.action_to_output(action_dict[list(action_dict.keys())[state.turn]]))
 
-                # Execute in MDP.
-                reward_dict, next_state = self.markov_game_mdp.execute_agent_action(action_dict)
+                    # Execute in MDP.
+                    reward_dict, next_state = self.markov_game_mdp.execute_agent_action(action_dict)
 
-                # Update pointer.
-                state = next_state
+                    # Update pointer.
+                    state = next_state
 
-            # Reset the MDP, tell the agent the episode is over.
-            self.markov_game_mdp.reset()
+                # Reset the MDP, tell the agent the episode is over.
+                self.markov_game_mdp.reset()
 
         return (data_x, data_y)
 
@@ -284,9 +285,9 @@ class Chief_Agent_BlockGame(Agent):
         for step in range(30):
             if chief_ind == 0:
                 action_dict[chief_name] = action_tracker
-                action_dict[other_player_name] = self.actions[self.get_predicted_action(state)]
+                action_dict[other_player_name] = self.get_predicted_action(state)
             else:
-                action_dict[other_player_name] = self.actions[self.get_predicted_action(state)]
+                action_dict[other_player_name] = self.get_predicted_action(state)
                 action_dict[chief_name] = action_tracker
 
             # Terminal check.
@@ -320,9 +321,15 @@ class Chief_Agent_BlockGame(Agent):
         for a in self.playerpoolwc.clones:
             preds += self.bayesian_inference_distribution[self.agent_mapping[a]]*probs[a]
 
-        return np.argmax(preds)
+        return self.actions[np.argmax(preds)]
 
-    def make_prob(self, probs):
+    def make_prob(self, probs, with_scaling=False):
+        if with_scaling:
+            pmax = max(probs)
+            
+            if pmax < 0.25:
+                probs = np.array(probs) + (0.25 - pmax)
+
         distr = probs/np.sum(probs)
         distr[-1] = 1 - np.sum(distr[:-1])
         return distr
@@ -332,7 +339,8 @@ class Chief_Agent_BlockGame(Agent):
         agent_probs = np.zeros(self.num_agents)
 
         for a in self.playerpoolwc.clones:
+            print(a, action_probs[a][action], np.argmax(action_probs[a]))
             agent_probs[self.agent_mapping[a]] = action_probs[a][action]
 
         self.bayesian_inference_distribution = self.make_prob(
-            agent_probs*self.bayesian_inference_distribution)
+            agent_probs*self.bayesian_inference_distribution, with_scaling=True)

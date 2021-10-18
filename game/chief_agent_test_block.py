@@ -160,7 +160,7 @@ cooperative_or_greedy_agent = DynamicPolicyBlockGameAgent(
     cooperative_or_greedy_policy, 'CoopOrGreedy', True, True)
 
 
-agents_list = [minimax_agent, max_self_agent, max_other_agent, max_welfare_agent, random_action_agent, random_policy_agent, play_num_based_agent, efficient_cooperation_agent, cooperative_or_greedy_agent]
+agents_list = [minimax_agent, max_self_agent, max_other_agent, max_welfare_agent, play_num_based_agent, efficient_cooperation_agent, cooperative_or_greedy_agent]
 player_pool = PlayerPoolWithClones(agents_list, 10, 30, 0.3, 9, "block_chief_testing_savedparams/traindata", "block_chief_testing_savedparams/params", BlockGameMDP())
 player_pool.train_clones()
 # player_pool.validate_clones()
@@ -179,14 +179,19 @@ else:
     agents = [chief_player, human_player]
 
 markov_game = BlockGameMDP()
-markov_game.reset()
-state = markov_game.get_init_state()
 
 res = 0
 step_num = 200
+total_correct = 0
+count = 0
 
 for step in range(step_num):
+    s_ind = 0
+    markov_game.reset()
+    state = markov_game.get_init_state()
+
     while(not state.is_terminal()):
+        s_ind += 1
         action_dict = dict()
         reward_dict = defaultdict(str)
 
@@ -196,17 +201,21 @@ for step in range(step_num):
             agent_reward = reward_dict[a.name]
             agent_action = a.act(state, agent_reward, step)
 
-            if a.name != "chief" and np.random.random() < .2: # adding noise
+            if a.name != "chief" and np.random.random() < .05: # adding noise
                 agent_action = np.random.choice(state.valid_moves())
 
             action_dict[a.name] = agent_action
 
         correct_val = int(prediction == action_dict[human_player.name])
+        total_correct += correct_val
+        count += 1
         reward_dict, next_state = markov_game.execute_agent_action(action_dict)
         state = next_state
 
-        print("========= AFTER STEP:", step, "==========")
+        print("========= AFTER STEP:", s_ind, "==========")
         table = [["agent options"] + list(player_pool.clones.keys()),
                  ["bayesian inference"] + list(np.vectorize(lambda A: round(A,3))(chief_player.bayesian_inference_distribution))]
         print(tabulate(table))
         print("Prediction:", prediction, "which was", bool(correct_val), "(actual action: " + str(action_dict[human_player.name]) + ")")
+
+    print("% correct:", total_correct/count)
