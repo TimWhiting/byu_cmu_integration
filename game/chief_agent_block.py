@@ -111,7 +111,7 @@ class PlayerPoolWithClones(object):
 
                 d[agent_blueprint.name] = (train_x, train_y)
             else:
-                train_x, train_y = d["train X", "train Y"]
+                train_x, train_y = d[agent_blueprint.name]
 
             self._train_loop_clone(agent_blueprint.name, train_x, train_y)
 
@@ -314,33 +314,35 @@ class Chief_Agent_BlockGame(Agent):
         # This will never need to reset any parameters, since they can just be used over multiple games
         return
 
-    def get_predicted_action(self, state):
+    def get_predicted_action(self, state, print_flag=False):
         preds = np.zeros(len(self.actions))
         probs = self.playerpoolwc.get_probs(state)
 
         for a in self.playerpoolwc.clones:
             preds += self.bayesian_inference_distribution[self.agent_mapping[a]]*probs[a]
 
+        if print_flag:
+            print(np.max(preds))
+
         return self.actions[np.argmax(preds)]
 
-    def make_prob(self, probs, with_scaling=False):
-        if with_scaling:
-            pmax = max(probs)
-            
-            if pmax < 0.25:
-                probs = np.array(probs) + (0.25 - pmax)
-
+    def make_prob(self, probs):
         distr = probs/np.sum(probs)
         distr[-1] = 1 - np.sum(distr[:-1])
         return distr
 
-    def bayes_update(self, state, action):
+    def bayes_update(self, state, action, with_scaling=False):
         action_probs = self.playerpoolwc.get_probs(state)
         agent_probs = np.zeros(self.num_agents)
 
         for a in self.playerpoolwc.clones:
-            print(a, action_probs[a][action], np.argmax(action_probs[a]))
             agent_probs[self.agent_mapping[a]] = action_probs[a][action]
 
+        if with_scaling: # If conditional is below a certain update, (ignore) or scale
+            pmax = max(agent_probs)
+
+            if pmax < 1/(2*self.num_agents):
+                agent_probs = np.ones(self.num_agents)
+
         self.bayesian_inference_distribution = self.make_prob(
-            agent_probs*self.bayesian_inference_distribution, with_scaling=True)
+            agent_probs*self.bayesian_inference_distribution)

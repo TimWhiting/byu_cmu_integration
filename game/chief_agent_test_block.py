@@ -7,6 +7,7 @@ from simple_rl.agents import QLearningAgent
 from simple_rl.run_experiments import play_markov_game
 from typing import List, Tuple
 from tabulate import tabulate
+import matplotlib.pyplot as plt
 
 block_game_tree = BlockGameTree()
 
@@ -160,17 +161,18 @@ cooperative_or_greedy_agent = DynamicPolicyBlockGameAgent(
     cooperative_or_greedy_policy, 'CoopOrGreedy', True, True)
 
 
-agents_list = [minimax_agent, max_self_agent, max_other_agent, max_welfare_agent, play_num_based_agent, efficient_cooperation_agent, cooperative_or_greedy_agent]
+agents_list = [minimax_agent, max_self_agent, max_other_agent, max_welfare_agent]
 player_pool = PlayerPoolWithClones(agents_list, 10, 30, 0.3, 9, "block_chief_testing_savedparams/traindata", "block_chief_testing_savedparams/params", BlockGameMDP())
 player_pool.train_clones()
-# player_pool.validate_clones()
+player_pool.validate_clones()
 
 human_idx = 0
 chief_player = Chief_Agent_BlockGame("chief", ACTIONS, player_pool, 1 - human_idx)
 
 
 
-human_player = DynamicPolicyBlockGameAgent(play_num_based_policy, 'PlayNumBased', True, True)
+human_player = FixedPolicyBlockGameAgent(
+    max_self_func, 'MaxSelf', block_game_tree)
 
 # execution
 if human_idx == 0:
@@ -181,9 +183,12 @@ else:
 markov_game = BlockGameMDP()
 
 res = 0
-step_num = 200
+step_num = 50
 total_correct = 0
 count = 0
+
+plots = {"correct":[],"avg_correct":[],"confidences":[]}
+total_rewards = {chief_player.name:0, human_player.name:0}
 
 for step in range(step_num):
     s_ind = 0
@@ -193,22 +198,29 @@ for step in range(step_num):
     while(not state.is_terminal()):
         s_ind += 1
         action_dict = dict()
-        reward_dict = defaultdict(str)
+        reward_dict = defaultdict(int)
 
-        prediction = chief_player.get_predicted_action(state)
+        prediction = chief_player.get_predicted_action(state, print_flag=True)
 
         for a in agents:
             agent_reward = reward_dict[a.name]
+            total_rewards[a.name] += agent_reward
             agent_action = a.act(state, agent_reward, step)
 
-            if a.name != "chief" and np.random.random() < .05: # adding noise
+            if a.name != "chief" and np.random.random() < 0: # adding noise
                 agent_action = np.random.choice(state.valid_moves())
 
             action_dict[a.name] = agent_action
 
-        correct_val = int(prediction == action_dict[human_player.name])
-        total_correct += correct_val
-        count += 1
+        if state.turn == human_idx:
+            correct_val = int(prediction == action_dict[human_player.name])
+            total_correct += correct_val
+            count += 1
+
+        plots["correct"].append(correct_val)
+        plots["avg_correct"].append(total_correct/count)
+        plots["confidences"].append(list(chief_player.bayesian_inference_distribution))
+
         reward_dict, next_state = markov_game.execute_agent_action(action_dict)
         state = next_state
 
@@ -216,6 +228,28 @@ for step in range(step_num):
         table = [["agent options"] + list(player_pool.clones.keys()),
                  ["bayesian inference"] + list(np.vectorize(lambda A: round(A,3))(chief_player.bayesian_inference_distribution))]
         print(tabulate(table))
-        print("Prediction:", prediction, "which was", bool(correct_val), "(actual action: " + str(action_dict[human_player.name]) + ")")
+        if state.turn == human_idx:
+            print("Prediction:", prediction, "which was", bool(correct_val), "(actual action: " + str(action_dict[human_player.name]) + ")")
 
     print("% correct:", total_correct/count)
+    print(total_rewards)
+
+
+plt.figure(1)
+plt.plot(plots["correct"], 'bo')
+plt.title("correct or not at time t")
+
+plt.figure(2)
+plt.plot(plots["avg_correct"])
+plt.gca().set_ylim(0,1)
+plt.title("% Correct since time 0")
+
+plt.figure(3)
+Arr = np.transpose(np.array(plots["confidences"]))
+for i,a in enumerate(list(player_pool.clones.keys())):
+    plt.plot(Arr[i],label=a)
+plt.legend()
+plt.gca().set_ylim(-0.1,1.1)
+plt.title("Confidence in each agent")
+
+plt.show()
