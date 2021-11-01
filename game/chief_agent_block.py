@@ -1,4 +1,5 @@
 import copy
+from typing import Optional
 import numpy as np
 import os
 import json
@@ -98,14 +99,18 @@ class PlayerPoolWithClones(object):
             train_x, train_y = [], []
 
             if agent_blueprint.name in model_params:
-                print(agent_blueprint.name, " already has trained parameters. Loading now...")
-                self.clones[agent_blueprint.name][0].load_state_dict(model_params[agent_blueprint.name])
-                self.clones[agent_blueprint.name][1].load_state_dict(model_params[agent_blueprint.name + "_optim"])
+                print(agent_blueprint.name,
+                      " already has trained parameters. Loading now...")
+                self.clones[agent_blueprint.name][0].load_state_dict(
+                    model_params[agent_blueprint.name])
+                self.clones[agent_blueprint.name][1].load_state_dict(
+                    model_params[agent_blueprint.name + "_optim"])
                 continue
 
-            if not (agent_blueprint.name in d): # If no training data exists for this agent
+            if not (agent_blueprint.name in d):  # If no training data exists for this agent
                 for teammate_blueprint in self.agents:
-                    x_addition, y_addition = self._gen_data(agent_blueprint, teammate_blueprint)
+                    x_addition, y_addition = self._gen_data(
+                        agent_blueprint, teammate_blueprint)
                     train_x += x_addition
                     train_y += y_addition
 
@@ -119,7 +124,7 @@ class PlayerPoolWithClones(object):
         # Update files with any new data #
         ##################################
         with open(self.train_data_file, "w") as f:
-            json.dump(d,f)
+            json.dump(d, f)
 
         self.resave_model_params()
         print("training done")
@@ -140,7 +145,7 @@ class PlayerPoolWithClones(object):
         agent2.name = "a2"
         agent_dict = {}
 
-        for a in [agent1,agent2]:
+        for a in [agent1, agent2]:
             agent_dict[a.name] = a
 
         for episode in range(episodes):
@@ -164,10 +169,12 @@ class PlayerPoolWithClones(object):
 
                 if (state.turn == agent_ind):
                     data_x.append(self.state_to_input(state))
-                    data_y.append(self.action_to_output(action_dict[list(action_dict.keys())[state.turn]]))
+                    data_y.append(self.action_to_output(
+                        action_dict[list(action_dict.keys())[state.turn]]))
 
                 # Execute in MDP.
-                reward_dict, next_state = self.markov_game_mdp.execute_agent_action(action_dict)
+                reward_dict, next_state = self.markov_game_mdp.execute_agent_action(
+                    action_dict)
 
                 # Update pointer.
                 state = next_state
@@ -179,8 +186,8 @@ class PlayerPoolWithClones(object):
 
     def _train_loop_clone(self, agent_name, train_x, train_y, update_models=True, epochs=10):
         agent_clone, agent_optim = self.clones[agent_name]
-        
-        data_set = TensorDataset(torch.Tensor(train_x),torch.Tensor(train_y))
+
+        data_set = TensorDataset(torch.Tensor(train_x), torch.Tensor(train_y))
         data_loader = DataLoader(data_set, batch_size=20, shuffle=True)
         loss_fn = nn.NLLLoss()
         test_acc = []
@@ -188,7 +195,7 @@ class PlayerPoolWithClones(object):
         for e in range(epochs):
             avg_loss = 0
 
-            for batch, (X,y) in enumerate(data_loader):
+            for batch, (X, y) in enumerate(data_loader):
                 pred = agent_clone(X)
                 loss = loss_fn(pred, y.to(torch.long))
                 avg_loss += loss
@@ -198,7 +205,8 @@ class PlayerPoolWithClones(object):
                     loss.backward()
                     agent_optim.step()
                 else:
-                    test_acc += list((torch.argmax(pred,axis=1) == y.to(torch.long)).to(torch.float))
+                    test_acc += list((torch.argmax(pred, axis=1)
+                                     == y.to(torch.long)).to(torch.float))
 
             if update_models:
                 print(agent_name, " - ", e, ":", avg_loss/batch)
@@ -216,11 +224,13 @@ class PlayerPoolWithClones(object):
             test_x, test_y = [], []
 
             for teammate_blueprint in self.agents:
-                test_x_addition, test_y_addition = self._gen_data(agent_blueprint, teammate_blueprint, episodes=500)
+                test_x_addition, test_y_addition = self._gen_data(
+                    agent_blueprint, teammate_blueprint, episodes=500)
                 test_x += test_x_addition
                 test_y += test_y_addition
 
-            self._train_loop_clone(agent_blueprint.name, test_x, test_y, update_models=False)
+            self._train_loop_clone(agent_blueprint.name,
+                                   test_x, test_y, update_models=False)
 
 
 class Chief_Agent_BlockGame(Agent):
@@ -240,9 +250,19 @@ class Chief_Agent_BlockGame(Agent):
         self.player_ind = player_ind
         self.prev_state = None
 
+    def get_proposed_model(self, state, reward, episode_number, chosen_action) -> Optional[Agent]:
+        for agent in self.playerpoolwc.agents:
+            agent_action = agent.act(state, reward, episode_number)
+
+            if agent_action == chosen_action:
+                return agent
+
+        return None
+
     def act(self, state, reward, episode_number):
         if self.prev_state != None and state.turn == 1 - self.player_ind:
-            self.bayes_update(self.prev_state, state.selection[1 - self.player_ind])
+            self.bayes_update(
+                self.prev_state, state.selection[1 - self.player_ind])
 
         self.prev_state = state
 
@@ -284,9 +304,11 @@ class Chief_Agent_BlockGame(Agent):
         for step in range(30):
             if chief_ind == 0:
                 action_dict[chief_name] = action_tracker
-                action_dict[other_player_name] = self.actions[self.get_predicted_action(state)]
+                action_dict[other_player_name] = self.actions[self.get_predicted_action(
+                    state)]
             else:
-                action_dict[other_player_name] = self.actions[self.get_predicted_action(state)]
+                action_dict[other_player_name] = self.actions[self.get_predicted_action(
+                    state)]
                 action_dict[chief_name] = action_tracker
 
             # Terminal check.
@@ -294,7 +316,8 @@ class Chief_Agent_BlockGame(Agent):
                 break
 
             # Execute in MDP.
-            reward_dict, next_state = self.playerpoolwc.markov_game_mdp.execute_agent_action(action_dict)
+            reward_dict, next_state = self.playerpoolwc.markov_game_mdp.execute_agent_action(
+                action_dict)
             chief_reward += reward_dict[chief_name]
 
             # Update pointer.
@@ -307,7 +330,6 @@ class Chief_Agent_BlockGame(Agent):
                 action_tracker = np.random.choice(state.valid_moves())
 
         return chief_reward
-
 
     def reset(self):
         # This will never need to reset any parameters, since they can just be used over multiple games

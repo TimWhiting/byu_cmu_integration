@@ -1,32 +1,36 @@
 import pickle
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.neighbors import KNeighborsRegressor, NearestNeighbors
+from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 from chief_block_aat import run_games
+from new_chief_block_aat import run_games_with_new_chief
 
-run_games(train=True)
+# Change this boolean flag if to switch between the old and new chief agent
+use_new_chief = False
+
+run_games_with_new_chief(
+    train=True) if use_new_chief else run_games(train=True)
 
 print('Training KNN model...')
 
 data_dir = './training_data/'
+training_data_file = 'training_data_new_chief.pickle' if use_new_chief else 'training_data.pickle'
 
-with open(data_dir + 'training_data.pickle', 'rb') as f:
+with open(data_dir + training_data_file, 'rb') as f:
     training_data = np.array(pickle.load(f))
 
-x = training_data[:, 0:-1]
+print(training_data[0])
+print(training_data[-1])
+
+x = training_data[:, 0:-2]
 y = training_data[:, -1]
 
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3)
-
-print('X train shape: ' + str(x_train.shape))
-print('Y train shape: ' + str(y_train.shape))
-print('X test shape: ' + str(x_test.shape))
-print('Y test shape: ' + str(y_test.shape))
+print('X train shape: ' + str(x.shape))
+print('Y train shape: ' + str(y.shape))
 
 scaler = StandardScaler()
-x_train_scaled = scaler.fit_transform(x_train)
-x_test_scaled = scaler.transform(x_test)
+x_scaled = scaler.fit_transform(x)
 
 
 def distance_func(x, y):
@@ -40,24 +44,24 @@ def distance_func(x, y):
     return sum([play_num_dist, round_num_dist, curr_avg_payoff_dist, human_static_during_round_dist, human_static_across_rounds_dist, human_captured_in_experts_dist])
 
 
-# parameters = {'weights': ('uniform', 'distance'),
-#               'n_neighbors': [5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
-#               'metric': [distance_func, 'minkowski']}
-parameters = {'weights': ['distance'],
-              'n_neighbors': [15],
-              'metric': [distance_func]}
+# parameters = {'weights': ['distance'],
+#               'n_neighbors': [15],
+#               'metric': [distance_func]}
 
-model = GridSearchCV(KNeighborsRegressor(), parameters)
-model.fit(x_train_scaled, y_train)
+# model = GridSearchCV(KNeighborsRegressor(), parameters)
+# model.fit(x_scaled, y)
 
-print('Best score: ' + str(model.best_score_))
-print('Best parameters: ' + str(model.best_params_))
+# print('Best score: ' + str(model.best_score_))
+# print('Best parameters: ' + str(model.best_params_))
 
-results = (y_test - model.predict(x_test_scaled))**2
-print(np.mean(results), np.max(results), np.min(results), np.var(results))
+model = NearestNeighbors(n_neighbors=15, metric=distance_func)
+model.fit(x_scaled)
 
-with open(data_dir + 'trained_knn_aat.pickle', 'wb') as f:
+trained_knn_file = 'trained_knn_aat_new_chief.pickle' if use_new_chief else 'trained_knn_aat.pickle'
+trained_knn_scaler_file = 'trained_knn_scaler_aat_new_chief.pickle' if use_new_chief else 'trained_knn_scaler_aat.pickle'
+
+with open(data_dir + trained_knn_file, 'wb') as f:
     pickle.dump(model, f)
 
-with open(data_dir + 'trained_knn_scaler_aat.pickle', 'wb') as f:
+with open(data_dir + trained_knn_scaler_file, 'wb') as f:
     pickle.dump(scaler, f)

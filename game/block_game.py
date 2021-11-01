@@ -104,7 +104,8 @@ class BlockGameState(State):
                 pass
         return self
 
-    REWARDS = [75, 65, 60, 25, 15, 10, 15, 5, 0]
+    # REWARDS = [75, 65, 60, 25, 15, 10, 15, 5, 0]
+    REWARDS = [40, 35, 30, 20, 10, 5, 15, 5, 0]
 
     def reward(self, player):
         reward = 0
@@ -127,7 +128,8 @@ class BlockGameState(State):
         if anyOf(mixed, lambda x: allOf(x, lambda y: y in playerBlocks)):
             return reward
         else:
-            return -reward / 4
+            return -reward / 2
+            # return -reward / 4
 
 
 def anyOf(iter, fcn):

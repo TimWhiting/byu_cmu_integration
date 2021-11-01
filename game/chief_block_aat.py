@@ -1,3 +1,4 @@
+from scipy.spatial import distance
 from old_chief_agent_block import PlayerPool, ChiefAgent
 from baseline_agent import BaselineAgent
 from alternator import *
@@ -33,7 +34,10 @@ def create_agents(human=False, train=True):
                 'greedy_until_negative': greedy_until_negative_agent,
                 'q_learning': ql_agent,
                 'random_action': random_action_agent,
-                'efficient_cooperation': efficient_cooperation_agent
+                'efficient_cooperation': efficient_cooperation_agent,
+                'minimax': minimax_agent,
+                'game_num_based': game_num_based_agent,
+                'random_policy': random_policy_agent
             }
 
     else:
@@ -41,7 +45,7 @@ def create_agents(human=False, train=True):
             'minimax': minimax_agent,
             'max_self': max_self_agent,
             'random_action': random_action_agent,
-            'efficient_cooperation': efficient_cooperation_agent,
+            'efficient_cooperation': efficient_cooperation_agent
         }
 
 
@@ -61,11 +65,11 @@ def run_games(train=False, aat_predict_func: 'function' = None):
     player_pool = PlayerPool(list(pool_agents.values()), sample_size=10)
 
     n_rounds = 50
-    epsilons = [0, 0.2, 0.3, 0.5, 0.7]
-    n_epochs = 100 if train else 50
+    n_epochs = 100 if train else 25
 
     training_data = []
     test_data = []
+    total_payoffs = []
 
     for epoch in range(1, n_epochs + 1):
         print('Epoch: {}'.format(epoch))
@@ -82,23 +86,31 @@ def run_games(train=False, aat_predict_func: 'function' = None):
             current_training_data = []
             current_predictions = []
 
-            for round_num in range(1, n_rounds + 1):
+            for round_num in range(0, n_rounds):
                 block_game.reset()
                 state = block_game.get_init_state()
                 action_map = dict()
+                round_predictions = []
 
                 while not state.is_terminal():
                     for agent in [human_teammate, chief_player]:
                         agent_reward = reward_map[agent.name]
                         agent_action = agent.act(
-                            state, agent_reward, round_num - 1) if not isinstance(agent, QLearningAgent) else agent.act(
+                            state, agent_reward, round_num) if not isinstance(agent, QLearningAgent) else agent.act(
                             state, agent_reward)
                         action_map[agent.name] = agent_action
 
                         if agent.name == 'Chief':
                             chiefs_proposed_model = agent.get_proposed_model()
-                            predicted_payoff = chiefs_proposed_model.baseline_payoff if not isinstance(
+                            proposed_avg_payoff = chiefs_proposed_model.baseline_payoff if not isinstance(
                                 chiefs_proposed_model, QLearningAgent) else -6.0874999999999995
+                            # proposed_avg_payoff = chiefs_proposed_model.baseline_payoff if not isinstance(
+                            #     chiefs_proposed_model, QLearningAgent) else -19.35
+                            n_remaining_rounds = n_rounds - round_num
+                            proposed_payoff_to_go = proposed_avg_payoff * n_remaining_rounds
+                            proposed_total_payoff = agent_reward + proposed_payoff_to_go
+                            # proposed_total_payoff = min(
+                            #     proposed_total_payoff, 200 * n_rounds) if proposed_total_payoff > 0 else max(proposed_total_payoff, -41.25 * n_rounds)
 
                             human_captured_in_experts = max(
                                 agent.current_bayesian_values) > 0.5
@@ -107,16 +119,35 @@ def run_games(train=False, aat_predict_func: 'function' = None):
                             human_static_across_rounds = True if isinstance(
                                 chiefs_proposed_model, FixedPolicyBlockGameAgent) else not chiefs_proposed_model.changes_across_rounds
 
-                            curr_tup = [state.get_play_num() + 1, round_num, (agent_reward / round_num) / predicted_payoff, int(
-                                human_static_during_round), int(human_static_across_rounds), int(human_captured_in_experts), predicted_payoff]
+                            curr_tup = [state.get_play_num() + 1, round_num + 1, agent_reward / proposed_total_payoff if proposed_total_payoff != 0 else agent_reward / 0.000001, int(
+                                human_static_during_round), int(human_static_across_rounds), int(human_captured_in_experts), proposed_total_payoff, proposed_total_payoff]
 
                             if train:
                                 current_training_data.append(curr_tup)
 
                             else:
-                                prediction = aat_predict_func(
-                                    curr_tup[:-1]) * predicted_payoff
-                                current_predictions.append(prediction[0])
+                                # prediction = aat_predict_func(
+                                #     curr_tup[:-1]) * predicted_payoff
+                                # round_predictions.append(prediction[0])
+                                predictions, corrections, distances = aat_predict_func(
+                                    curr_tup[:-2])
+
+                                total_payoff_pred = 0
+                                inverse_distance_sum = 0
+
+                                for dist in distances:
+                                    inverse_distance_sum += 1 / dist if dist != 0 else 1 / 0.000001
+
+                                for i in range(len(predictions)):
+                                    prediction_i = predictions[i]
+                                    correction_i = corrections[i]
+                                    distance_i = distances[i]
+                                    inverse_distance_i = 1 / distance_i if distance_i != 0 else 1 / 0.000001
+                                    distance_weight = inverse_distance_i / inverse_distance_sum
+                                    total_payoff_pred += ((proposed_total_payoff *
+                                                          correction_i) * distance_weight)
+
+                                round_predictions.append(total_payoff_pred)
 
                     updated_rewards_map, next_state = block_game.execute_agent_action(
                         action_map)
@@ -126,23 +157,30 @@ def run_games(train=False, aat_predict_func: 'function' = None):
 
                     state = next_state
 
-            avg_payoff = reward_map[chief_player.name] / n_rounds
+                if not train:
+                    avg_round_predictions = sum(
+                        round_predictions) / len(round_predictions)
+
+                    current_predictions.append(avg_round_predictions)
+
+            total_payoff = reward_map[chief_player.name]
             print('Avg payoff for ' + str(human_teammate.name) +
-                  ': ' + str(avg_payoff))
+                  ': ' + str(total_payoff))
+
+            total_payoffs.append((human_strategy, total_payoff))
 
             for tup in current_training_data:
-                tup[-1] = avg_payoff / tup[-1]
+                tup[-1] = total_payoff
+                tup[-2] = total_payoff / \
+                    tup[-2] if tup[-2] != 0 else total_payoff / 0.000001
 
-            squared_errors = []
-            average_payoffs = []
+            abs_errors = []
             for pred in current_predictions:
-                squared_errors.append((avg_payoff - pred) ** 2)
-                # squared_errors.append(pred)
-                # average_payoffs.append(avg_payoff)
+                abs_errors.append(abs(total_payoff - pred) / 100)
+                # abs_errors.append(pred / 100)
 
             training_data.extend(current_training_data)
-            test_data.append((human_strategy, squared_errors))
-            # test_data.append((human_strategy, squared_errors, average_payoffs))
+            test_data.append((human_strategy, abs_errors))
 
     if train:
         data_dir = './training_data/'
@@ -156,22 +194,27 @@ def run_games(train=False, aat_predict_func: 'function' = None):
             test_results = []
             for human_strategy, results in test_data:
                 if human_strategy == strategy_name:
-                    test_results.append(results[:300])
+                    test_results.append(results)
+
+            test_payoffs = []
+            for human_strategy, payoff in total_payoffs:
+                if human_strategy == strategy_name:
+                    test_payoffs.append(payoff)
 
             test_results = np.array(test_results).reshape(n_epochs, -1)
             xvals = list(range(test_results.shape[1]))
             mean_test_results = test_results.mean(axis=0)
-            var_test_results = test_results.var(axis=0)
+
+            print(mean_test_results)
 
             plt.plot(xvals, mean_test_results)
-            # plt.plot(xvals, var_test_results, color='red')
-            # plt.plot(xvals, average_payoff, color='red')
-            # plt.gca().set_ylim(0, 1)
+            # plt.plot(xvals, [
+            #          (sum(test_payoffs) / len(test_payoffs)) / 100] * len(xvals), color='red')
             plt.title(
-                'Average Payoff Prediction Squared Errors for ' + str(strategy_name))
-            plt.show()
-            # plt.plot(xvals, average_accuracy_till_now)
-            # plt.plot(xvals, baseline_accuracy_over_time, color="red")
-            # plt.gca().set_ylim(0, 1)
-            # plt.title("Average accuracy till each step")
+                'AAT Prediction Errors (abs) for CHIEF vs. ' + str(strategy_name))
+            # plt.title(
+            #     'AAT Payoff Predictions for CHIEF vs. ' + str(strategy_name))
+            plt.xlabel('Round #')
+            plt.ylabel('Total Payoff Prediction Error ($)')
+            # plt.ylabel('Total Payoff Prediction ($)')
             plt.show()

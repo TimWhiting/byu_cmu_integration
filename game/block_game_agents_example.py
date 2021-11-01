@@ -22,6 +22,8 @@ def minimax_func(reward_action_pairs: List[Tuple[Tuple[float, float], int]], tur
 
 minimax_agent = FixedPolicyBlockGameAgent(
     minimax_func, 'Minimax', block_game_tree, -30)
+# minimax_agent = FixedPolicyBlockGameAgent(
+#     minimax_func, 'Minimax', block_game_tree, -37.5)
 
 
 # Max self agent (tries to maximize their own payoff)
@@ -31,6 +33,8 @@ def max_self_func(reward_action_pairs: List[Tuple[Tuple[float, float], int]], tu
 
 max_self_agent = FixedPolicyBlockGameAgent(
     max_self_func, 'MaxSelf', block_game_tree, 90)
+# max_self_agent = FixedPolicyBlockGameAgent(
+#     max_self_func, 'MaxSelf', block_game_tree, 55)
 
 
 # Max welfare agent (tries to maximize the total payoff of both players)
@@ -40,6 +44,8 @@ def max_welfare_func(reward_action_pairs: List[Tuple[Tuple[float, float], int]],
 
 max_welfare_agent = FixedPolicyBlockGameAgent(
     max_welfare_func, 'MaxWelfare', block_game_tree, 125)
+# max_welfare_agent = FixedPolicyBlockGameAgent(
+#     max_welfare_func, 'MaxWelfare', block_game_tree, 70)
 
 
 # Max other agent (tries to maximize the payoff of the other player)
@@ -50,6 +56,8 @@ def max_other_func(reward_action_pairs: List[Tuple[Tuple[float, float], int]], t
 
 max_other_agent = FixedPolicyBlockGameAgent(
     max_other_func, 'MaxOther', block_game_tree, 125)
+# max_other_agent = FixedPolicyBlockGameAgent(
+#     max_other_func, 'MaxOther', block_game_tree, 70)
 
 
 # Min welfare agent (tries to minimize the total payoff of both players)
@@ -59,6 +67,8 @@ def min_welfare_func(reward_action_pairs: List[Tuple[Tuple[float, float], int]],
 
 min_welfare_agent = FixedPolicyBlockGameAgent(
     min_welfare_func, 'MinWelfare', block_game_tree, -31.875)
+# min_welfare_agent = FixedPolicyBlockGameAgent(
+#     min_welfare_func, 'MinWelfare', block_game_tree, -37.5)
 # -------------------------------------------------------------------
 # -------------------------------------------------------------------
 # -------------------------------------------------------------------
@@ -79,6 +89,8 @@ def random_action(state: BlockGameState, reward: float, episode_number: int) -> 
 
 random_action_agent = DynamicPolicyBlockGameAgent(
     random_action, 'RandomAction', True, False, -8.65)
+# random_action_agent = DynamicPolicyBlockGameAgent(
+#     random_action, 'RandomAction', True, False, -16.025)
 
 
 # Random policy agent (randomly picks an action from the static agents)
@@ -94,6 +106,8 @@ def random_policy(state: BlockGameState, reward: float, episode_number: int) -> 
 
 random_policy_agent = DynamicPolicyBlockGameAgent(
     random_action, 'RandomPolicy', True, False, -3.5625)
+# random_policy_agent = DynamicPolicyBlockGameAgent(
+#     random_action, 'RandomPolicy', True, False, -14.825)
 
 
 # Play num agent (changes strategy based on the play number)
@@ -112,6 +126,8 @@ def play_num_based_policy(state: BlockGameState, reward: float, episode_number: 
 
 play_num_based_agent = DynamicPolicyBlockGameAgent(
     play_num_based_policy, 'PlayNumBased', True, False, 90.0)
+# play_num_based_agent = DynamicPolicyBlockGameAgent(
+#     play_num_based_policy, 'PlayNumBased', True, False, 55)
 
 
 # Game num agent (changes strategy based on the episode/game number)
@@ -128,6 +144,8 @@ def game_num_based_policy(state: BlockGameState, reward: float, episode_number: 
 
 game_num_based_agent = DynamicPolicyBlockGameAgent(
     game_num_based_policy, 'GameNumBased', True, True, -8.0625)
+# game_num_based_agent = DynamicPolicyBlockGameAgent(
+#     game_num_based_policy, 'GameNumBased', True, True, -16.9)
 
 
 # Efficient cooperation agent (every other game it alternates between picking squares and triangles)
@@ -154,6 +172,8 @@ def efficient_cooperation_policy(state: BlockGameState, reward: float, episode_n
 
 efficient_cooperation_agent = DynamicPolicyBlockGameAgent(
     efficient_cooperation_policy, 'EfficientCoop', False, True, 125.0)
+# efficient_cooperation_agent = DynamicPolicyBlockGameAgent(
+#     efficient_cooperation_policy, 'EfficientCoop', False, True, 70)
 
 
 # Cooperative or greedy agent (tries to achieve efficient cooperation, but will occasionally
@@ -167,6 +187,8 @@ def cooperative_or_greedy_policy(state: BlockGameState, reward: float, episode_n
 
 cooperative_or_greedy_agent = DynamicPolicyBlockGameAgent(
     cooperative_or_greedy_policy, 'CoopOrGreedy', True, True, 121.875)
+# cooperative_or_greedy_agent = DynamicPolicyBlockGameAgent(
+#     cooperative_or_greedy_policy, 'CoopOrGreedy', True, True, 65.8)
 
 
 # Greedy until negative agent (plays greedily until its reward is negative; after that, it
@@ -181,6 +203,8 @@ def greedy_until_negative_policy(state: BlockGameState, reward: float, episode_n
 
 greedy_until_negative_agent = DynamicPolicyBlockGameAgent(
     greedy_until_negative_policy, 'GreedUntilNegative', True, True, 90.0)
+# greedy_until_negative_agent = DynamicPolicyBlockGameAgent(
+#     greedy_until_negative_policy, 'GreedUntilNegative', True, True, 55)
 
 # Q-learning agent (tries to learn ideal actions over time)
 ql_agent = QLearningAgent(actions=ACTIONS, name="QL")
